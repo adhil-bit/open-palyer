@@ -1,7 +1,7 @@
 /* Open Player — offline, ad-free video player PWA.
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -138,8 +138,17 @@ function makeThumb(file) {
     const finish = r => { if (done) return; done = true; clearTimeout(to); v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); resolve(r); };
     const to = setTimeout(() => finish(v.duration ? { dur: v.duration, thumb: null } : null), 9000);
     v.muted = true; v.preload = 'metadata'; v.playsInline = true;
-    v.onloadedmetadata = () => { v.currentTime = Math.min(Math.max(1, v.duration * 0.1), 30); };
+    let probing = false;
+    const seekForThumb = () => { v.currentTime = Math.min(Math.max(0.5, v.duration * 0.1), 30); };
+    v.onloadedmetadata = () => {
+      // Screen recordings often store no length (duration = Infinity).
+      // Jumping far past the end makes the browser work out the real length.
+      if (!isFinite(v.duration)) { probing = true; v.currentTime = 1e101; return; }
+      seekForThumb();
+    };
+    v.ondurationchange = () => { if (probing && isFinite(v.duration)) { probing = false; seekForThumb(); } };
     v.onseeked = () => {
+      if (probing) return;
       try {
         const w = 256, h = v.videoHeight ? Math.round(w * v.videoHeight / v.videoWidth) : 144;
         const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -280,6 +289,7 @@ function openSheet(title, html, onClose) {
   $('#sheetTitle').textContent = title;
   $('#sheetBody').innerHTML = html;
   sheet.hidden = scrim.hidden = false;
+  sheet.scrollTop = 0;
   sheetOnClose = onClose || null;
   holdControls(true);
   return $('#sheetBody');
@@ -509,6 +519,11 @@ function load(item, startAt) {
   $('#btnNext').disabled = P.idx >= P.queue.length - 1; $('#btnNext').style.opacity = P.idx >= P.queue.length - 1 ? .35 : 1;
   $('#spinner').hidden = false;
   P.pendingStart = startAt;
+  P.ab = { a: null, b: null };
+  P.audioDelay = item.remote ? 0 : (allDelays[item.id] || 0);
+  if (!item.remote && (S.eqOn || P.audioDelay)) ensureBoost();
+  applyAudioFx();
+  if (P.rec) stopRecording();
   if (item.sub) loadSubFile(item.sub, true);
   applyBright();
   setupMediaSession();
@@ -517,6 +532,23 @@ function load(item, startAt) {
 }
 function onMeta() {
   const v = P.v, it = P.item;
+  if (!isFinite(v.duration) && !it.remote) {
+    // No stored length (common in screen recordings): probe it, then continue.
+    if (P.probing) return;
+    P.probing = true;
+    const wasPaused = v.paused;
+    const done = () => {
+      if (!isFinite(v.duration)) return;
+      v.removeEventListener('durationchange', done);
+      P.probing = false;
+      v.currentTime = 0;
+      if (!wasPaused) v.play().catch(() => {});
+      onMeta();
+    };
+    v.addEventListener('durationchange', done);
+    v.currentTime = 1e101;
+    return;
+  }
   if (it && !it.remote) { it.dur = v.duration; it.w = v.videoWidth; it.h = v.videoHeight; }
   $('#tDur').textContent = fmtTime(v.duration);
   if (v.videoWidth === 0 && v.videoHeight === 0) ptoast('Video codec not supported here — playing audio only');
@@ -534,8 +566,16 @@ function onMeta() {
     }
   }
   updateSeek();
+  drawMarkers();
+}
+function videoTransform() {
+  const t = [];
+  if (P.zoom !== 1) t.push(`scale(${P.zoom})`);
+  if (P.adj?.mirror) t.push('scaleX(-1)');
+  return t.join(' ');
 }
 function onTime() {
+  if (P.ab.b != null && P.v.currentTime >= P.ab.b) P.v.currentTime = P.ab.a;
   updateSeek();
   renderSub();
   const now = performance.now();
@@ -712,7 +752,7 @@ function applyAspect() {
     v.style.height = Math.min(v.videoHeight / dpr, H * 4) + 'px';
     v.style.objectFit = 'contain';
   }
-  v.style.transform = P.zoom !== 1 ? `scale(${P.zoom})` : '';
+  v.style.transform = videoTransform();
 }
 window.addEventListener('resize', () => { if (!P.el.hidden) applyAspect(); });
 
@@ -729,11 +769,22 @@ function autoOrient(force) {
 }
 
 /* --- brightness / volume --- */
+/* video look: gesture brightness + adjustments (contrast, saturation, hue, mirror) */
+const ADJ_DEFAULT = { contrast: 1, saturate: 1, hue: 0, gamma: 1, mirror: false };
+P.adj = { ...ADJ_DEFAULT };
 function applyBright() {
-  const b = P.bright;
+  const b = P.bright, a = P.adj;
   $('#dim').style.opacity = b < 1 ? (1 - b) * 0.9 : 0;
-  P.v.style.filter = b > 1 ? `brightness(${b})` : '';
+  const f = [];
+  if (b > 1) f.push(`brightness(${b})`);
+  if (a.gamma !== 1) f.push(`brightness(${a.gamma})`);
+  if (a.contrast !== 1) f.push(`contrast(${a.contrast})`);
+  if (a.saturate !== 1) f.push(`saturate(${a.saturate})`);
+  if (a.hue) f.push(`hue-rotate(${a.hue}deg)`);
+  P.v.style.filter = f.join(' ');
+  applyAspect();
 }
+
 function setVolume(val) {
   const allowBoost = !P.item?.remote;
   P.vol = clamp(val, 0, allowBoost ? 2 : 1);
@@ -747,17 +798,55 @@ function setVolume(val) {
     if (P.boost) P.boost.gain.gain.value = P.vol;
   }
 }
+
+/* audio chain: source → delay → 10-band equalizer → boost → limiter → speakers.
+   Built only when needed (boost, equalizer or audio delay is used). */
+const EQ_FREQS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const EQ_PRESETS = {
+  Flat:        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  'Bass boost':[7, 6, 5, 3, 1, 0, 0, 0, 0, 0],
+  'Bass + treble': [6, 5, 3, 1, -1, -1, 1, 3, 5, 6],
+  Treble:      [0, 0, 0, 0, 0, 1, 3, 5, 6, 7],
+  Vocal:       [-3, -2, -1, 1, 4, 5, 4, 2, 0, -1],
+  Headphones:  [4, 3, 1, 0, -1, 0, 1, 3, 4, 5],
+  Movie:       [4, 3, 2, 0, 1, 3, 3, 2, 1, 0],
+  Rock:        [5, 4, 2, -1, -2, -1, 2, 4, 5, 5],
+  Pop:         [-1, 1, 3, 4, 3, 0, -1, -1, 1, 2],
+  Classical:   [4, 3, 2, 1, -1, -1, 0, 2, 3, 4],
+  Dance:       [6, 5, 2, 0, 0, -2, -2, 0, 4, 5],
+  Night:       [-4, -3, -1, 1, 3, 4, 3, 1, -1, -3],
+};
+S.eqPreset ??= 'Flat';
+S.eqBands ??= EQ_PRESETS.Flat.slice();
+S.eqOn ??= false;
 function ensureBoost() {
-  if (P.boost) { P.boost.ctx.resume?.(); return; }
+  if (P.boost) { P.boost.ctx.resume?.(); return true; }
+  if (P.item?.remote) return false;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const src = ctx.createMediaElementSource(P.v);
+    const delay = ctx.createDelay(5);
+    const bands = EQ_FREQS.map((f, i) => {
+      const b = ctx.createBiquadFilter();
+      b.type = i === 0 ? 'lowshelf' : i === EQ_FREQS.length - 1 ? 'highshelf' : 'peaking';
+      b.frequency.value = f; b.Q.value = 1.1; b.gain.value = 0;
+      return b;
+    });
     const gain = ctx.createGain();
-    const comp = ctx.createDynamicsCompressor();   // keeps boosted audio from clipping harshly
+    const comp = ctx.createDynamicsCompressor();   // keeps boosted/EQ'd audio from clipping harshly
     comp.threshold.value = -6; comp.ratio.value = 4;
-    src.connect(gain).connect(comp).connect(ctx.destination);
-    P.boost = { ctx, gain };
-  } catch { P.boost = null; }
+    let node = src.connect(delay);
+    for (const b of bands) node = node.connect(b);
+    node.connect(gain).connect(comp).connect(ctx.destination);
+    P.boost = { ctx, gain, delay, bands };
+    applyAudioFx();
+    return true;
+  } catch { P.boost = null; return false; }
+}
+function applyAudioFx() {
+  if (!P.boost) return;
+  P.boost.bands.forEach((b, i) => (b.gain.value = S.eqOn ? S.eqBands[i] : 0));
+  P.boost.delay.delayTime.value = Math.max(0, P.audioDelay || 0);
 }
 
 /* --- HUDs --- */
@@ -818,7 +907,7 @@ function ripple(side) {
     if (mode === 'pinch' && pts.size === 2) {
       const [a, b] = [...pts.values()];
       P.zoom = clamp(pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d, 0.5, 4);
-      P.v.style.transform = `scale(${P.zoom})`;
+      P.v.style.transform = videoTransform();
       hud('i-aspect', (P.zoom - 0.5) / 3.5, Math.round(P.zoom * 100) + '%');
       return;
     }
@@ -956,22 +1045,270 @@ $('#pickSub').onchange = e => { const f = e.target.files[0]; e.target.value = ''
 
 function sheetMore() {
   const sleepLbl = P.sleepEnd ? 'End of video' : P.sleep ? `${Math.ceil((P.sleep.at - Date.now()) / 60000)} min left` : 'Off';
+  const abLbl = P.ab.b != null ? `${fmtTime(P.ab.a)} → ${fmtTime(P.ab.b)}` : P.ab.a != null ? `A at ${fmtTime(P.ab.a)} · tap to set B` : 'Off';
+  const local = !P.item.remote;
   const b = openSheet('More',
+    `<div class="group">Tools</div>` +
+    opt('record', 'i-rec', P.rec ? 'Stop recording' : 'Record clip<small>Saves what plays as a video file</small>', P.rec ? '<span class="val" style="color:#ff5d5d">● REC</span>' : '', P.rec ? 'danger' : '') +
+    opt('shot', 'i-camera', 'Save screenshot') +
+    opt('ab', 'i-loop', 'A-B repeat', `<span class="val">${abLbl}</span>`) +
+    opt('jump', 'i-fwd', 'Jump to time') +
+    opt('bookmarks', 'i-bookmark', 'Bookmarks', `<span class="val">${getMarks().length || ''}</span>`) +
+    `<div class="group">Picture &amp; sound</div>` +
     opt('aspect', 'i-aspect', 'Aspect ratio', `<span class="val">${ASPECTS[P.aspect][1]}</span>`) +
+    opt('adjust', 'i-sun', 'Video adjustments<small>Contrast, color, mirror</small>') +
+    (local ? opt('eq', 'i-eq', 'Equalizer', `<span class="val">${S.eqOn ? esc(S.eqPreset) : 'Off'}</span>`) : '') +
+    (local ? opt('adelay', 'i-vol', 'Audio delay', `<span class="val">${P.audioDelay ? '+' + Math.round(P.audioDelay * 1000) + ' ms' : 'Off'}</span>`) : '') +
+    `<div class="group">Playback</div>` +
     opt('repeat', 'i-loop', 'Repeat', `<span class="val">${{ off: 'Off', one: 'This video', all: 'All in list' }[P.repeat]}</span>`) +
     opt('sleep', 'i-moon', 'Sleep timer', `<span class="val">${sleepLbl}</span>`) +
-    opt('shot', 'i-pip', 'Save screenshot') +
     opt('info', 'i-info', 'Video details'));
   b.onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
-    if (o === 'aspect') { closeSheet(); return sheetAspect(); }
-    if (o === 'repeat') { P.repeat = { off: 'one', one: 'all', all: 'off' }[P.repeat]; P.v.loop = false; }
-    if (o === 'sleep') { closeSheet(); return sheetSleep(); }
-    if (o === 'shot') { closeSheet(); return screenshot(); }
-    if (o === 'info') { closeSheet(); return P.item.remote ? ptoast(P.item.url) : showInfo(P.item); }
-    closeSheet(); sheetMore();
+    closeSheet();
+    if (o === 'record') return P.rec ? stopRecording() : startRecording();
+    if (o === 'shot') return screenshot();
+    if (o === 'ab') return cycleAB();
+    if (o === 'jump') return sheetJump();
+    if (o === 'bookmarks') return sheetBookmarks();
+    if (o === 'aspect') return sheetAspect();
+    if (o === 'adjust') return sheetAdjust();
+    if (o === 'eq') return sheetEq();
+    if (o === 'adelay') return sheetAudioDelay();
+    if (o === 'sleep') return sheetSleep();
+    if (o === 'info') return sheetMediaInfo();
+    if (o === 'repeat') { P.repeat = { off: 'one', one: 'all', all: 'off' }[P.repeat]; P.v.loop = false; sheetMore(); }
   };
 }
+
+/* ---------- A-B repeat ---------- */
+P.ab = { a: null, b: null };
+function cycleAB() {
+  const t = P.v.currentTime;
+  if (P.ab.a == null) { P.ab.a = t; ptoast(`A set at ${fmtTime(t)} — open again to set B`); }
+  else if (P.ab.b == null) {
+    if (t <= P.ab.a + 0.5) { ptoast('B must be after A'); return; }
+    P.ab.b = t; P.v.currentTime = P.ab.a; ptoast(`Looping ${fmtTime(P.ab.a)} → ${fmtTime(P.ab.b)}`, 'Clear', clearAB, 4000);
+  } else { clearAB(); ptoast('A-B repeat off'); }
+  drawMarkers();
+}
+function clearAB() { P.ab = { a: null, b: null }; drawMarkers(); }
+
+/* ---------- jump to time ---------- */
+function sheetJump() {
+  const b = openSheet('Jump to time', `
+    <div style="padding:4px 20px 12px">
+      <input id="jumpIn" inputmode="numeric" placeholder="e.g. 1:23:45 or 12:30" value="${fmtTime(P.v.currentTime)}"
+        style="width:100%;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);padding:0 14px;font-size:18px;font-variant-numeric:tabular-nums">
+      <p style="color:var(--muted);font-size:12.5px;margin:8px 2px 12px">Length ${fmtTime(P.v.duration)}</p>
+      <button class="btn primary" id="jumpGo" style="width:100%;justify-content:center">Go</button>
+    </div>`);
+  const go = () => {
+    const parts = $('#jumpIn').value.trim().split(/[:.\s]/).filter(Boolean).map(Number);
+    if (!parts.length || parts.some(isNaN)) return $('#jumpIn').focus();
+    const s = parts.reduce((acc, n) => acc * 60 + n, 0);
+    P.v.currentTime = clamp(s, 0, (P.v.duration || s) - 0.1);
+    closeSheet();
+  };
+  $('#jumpGo', b).onclick = go;
+  $('#jumpIn', b).onkeydown = e => e.key === 'Enter' && go();
+  setTimeout(() => { const i = $('#jumpIn'); i?.focus(); i?.select(); }, 50);
+}
+
+/* ---------- bookmarks (saved per video) ---------- */
+const allMarks = store.get('bookmarks', {});
+const getMarks = () => (P.item && allMarks[P.item.id]) || [];
+function sheetBookmarks() {
+  const draw = () => {
+    const m = getMarks();
+    return opt('add', 'i-plus', `Add bookmark at ${fmtTime(P.v.currentTime)}`) +
+      (m.length ? m.map((t, i) =>
+        `<div class="opt" style="padding-right:8px"><button class="lbl" data-go="${i}" style="text-align:left;display:flex;align-items:center;gap:14px"><svg><use href="#i-bookmark"/></svg>${fmtTime(t)}</button>
+         <button class="icon-btn sm" data-del="${i}" aria-label="Delete bookmark"><svg><use href="#i-trash"/></svg></button></div>`).join('')
+      : `<p style="color:var(--muted);padding:6px 20px 12px;margin:0">No bookmarks yet. They also show as marks on the seek bar.</p>`);
+  };
+  const b = openSheet('Bookmarks', draw());
+  b.onclick = e => {
+    const m = getMarks().slice();
+    if (e.target.closest('[data-o="add"]')) {
+      const t = Math.round(P.v.currentTime * 10) / 10;
+      if (!m.some(x => Math.abs(x - t) < 1)) m.push(t);
+      m.sort((x, y) => x - y);
+    } else if (e.target.closest('[data-del]')) m.splice(+e.target.closest('[data-del]').dataset.del, 1);
+    else if (e.target.closest('[data-go]')) { P.v.currentTime = m[+e.target.closest('[data-go]').dataset.go]; closeSheet(); return; }
+    else return;
+    if (m.length) allMarks[P.item.id] = m; else delete allMarks[P.item.id];
+    store.set('bookmarks', allMarks);
+    b.innerHTML = draw(); drawMarkers();
+  };
+}
+function drawMarkers() {
+  const host = $('#seekMarks'); if (!host) return;
+  const d = P.v.duration;
+  if (!d || !isFinite(d)) { host.innerHTML = ''; return; }
+  let html = getMarks().map(t => `<i class="mk" style="left:${t / d * 100}%"></i>`).join('');
+  if (P.ab.a != null) {
+    const a = P.ab.a / d * 100, bb = P.ab.b != null ? P.ab.b / d * 100 : a;
+    html += `<i class="ab" style="left:${a}%;width:${Math.max(0.6, bb - a)}%"></i>`;
+  }
+  host.innerHTML = html;
+}
+
+/* ---------- video adjustments ---------- */
+function sheetAdjust() {
+  const rows = [
+    ['gamma', 'Brightness', 0.5, 1.6, 0.05, v => Math.round(v * 100) + '%'],
+    ['contrast', 'Contrast', 0.5, 2, 0.05, v => Math.round(v * 100) + '%'],
+    ['saturate', 'Saturation', 0, 2.5, 0.05, v => Math.round(v * 100) + '%'],
+    ['hue', 'Hue', -180, 180, 5, v => v + '°'],
+  ];
+  const draw = () => rows.map(([k, l, mn, mx, st, f]) =>
+    `<div class="range-row"><span style="width:84px">${l}</span><input type="range" data-k="${k}" min="${mn}" max="${mx}" step="${st}" value="${P.adj[k]}"><output>${f(P.adj[k])}</output></div>`).join('') +
+    opt('mirror', 'i-aspect', 'Mirror (flip left-right)', sw(P.adj.mirror)) +
+    opt('reset', 'i-refresh', 'Reset all');
+  const b = openSheet('Video adjustments', draw());
+  const bind = () => $$('input[data-k]', b).forEach(inp => inp.oninput = () => {
+    const r = rows.find(x => x[0] === inp.dataset.k);
+    P.adj[inp.dataset.k] = +inp.value; inp.nextElementSibling.textContent = r[5](+inp.value); applyBright();
+  });
+  bind();
+  b.onclick = e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    if (o === 'mirror') P.adj.mirror = !P.adj.mirror;
+    if (o === 'reset') P.adj = { ...ADJ_DEFAULT };
+    applyBright(); b.innerHTML = draw(); bind();
+  };
+}
+
+/* ---------- equalizer ---------- */
+function sheetEq() {
+  const lbl = f => (f >= 1000 ? f / 1000 + 'k' : f);
+  const draw = () =>
+    opt('toggle', 'i-eq', 'Equalizer', sw(S.eqOn)) +
+    `<div class="chips">${Object.keys(EQ_PRESETS).map(p =>
+      `<button data-p="${esc(p)}" class="${S.eqOn && S.eqPreset === p ? 'sel' : ''}">${esc(p)}</button>`).join('')}
+      ${S.eqPreset === 'Custom' ? '<button class="sel">Custom</button>' : ''}</div>
+     <div class="eq${S.eqOn ? '' : ' off'}">${EQ_FREQS.map((f, i) =>
+      `<label><output>${S.eqBands[i] > 0 ? '+' : ''}${S.eqBands[i]}</output><input type="range" data-i="${i}" min="-12" max="12" step="1" value="${S.eqBands[i]}" orient="vertical"><span>${lbl(f)}</span></label>`).join('')}</div>`;
+  const b = openSheet('Equalizer', draw());
+  const bind = () => $$('input[data-i]', b).forEach(inp => inp.oninput = () => {
+    S.eqBands[+inp.dataset.i] = +inp.value; S.eqPreset = 'Custom'; S.eqOn = true;
+    inp.previousElementSibling.textContent = (+inp.value > 0 ? '+' : '') + inp.value;
+    ensureBoost(); applyAudioFx(); saveSettings();
+  });
+  const refresh = () => { b.innerHTML = draw(); bind(); };
+  bind();
+  b.onclick = e => {
+    const p = e.target.closest('[data-p]')?.dataset.p;
+    if (p) { S.eqPreset = p; S.eqBands = EQ_PRESETS[p].slice(); S.eqOn = true; }
+    else if (e.target.closest('[data-o="toggle"]')) S.eqOn = !S.eqOn;
+    else return;
+    if (S.eqOn && !ensureBoost()) { S.eqOn = false; ptoast('Equalizer isn’t available for this video'); }
+    applyAudioFx(); saveSettings(); refresh();
+  };
+}
+
+/* ---------- audio delay (saved per video) ---------- */
+const allDelays = store.get('audioDelays', {});
+function sheetAudioDelay() {
+  const draw = () => `
+    <p style="color:var(--muted);padding:0 20px 6px;margin:0;font-size:13px">Sound ahead of the picture? Delay it until lips match.</p>
+    <div class="range-row"><input type="range" id="adR" min="0" max="2000" step="50" value="${Math.round((P.audioDelay || 0) * 1000)}"><output>+${Math.round((P.audioDelay || 0) * 1000)} ms</output></div>
+    <div class="grid-opts"><button data-d="-100">−100</button><button data-d="-50">−50</button><button data-d="50">+50</button><button data-d="100">+100</button></div>
+    ${opt('reset', 'i-refresh', 'Reset to 0')}`;
+  const b = openSheet('Audio delay', draw());
+  const set = ms => {
+    P.audioDelay = clamp(ms, 0, 2000) / 1000;
+    if (P.audioDelay && !ensureBoost()) { P.audioDelay = 0; ptoast('Audio delay isn’t available for this video'); }
+    applyAudioFx();
+    if (P.audioDelay) allDelays[P.item.id] = P.audioDelay; else delete allDelays[P.item.id];
+    store.set('audioDelays', allDelays);
+  };
+  const bind = () => { $('#adR', b).oninput = e => { set(+e.target.value); e.target.nextElementSibling.textContent = `+${e.target.value} ms`; }; };
+  bind();
+  b.onclick = e => {
+    const d = e.target.closest('[data-d]')?.dataset.d;
+    if (d) set(Math.round((P.audioDelay || 0) * 1000) + +d);
+    else if (e.target.closest('[data-o="reset"]')) set(0);
+    else return;
+    b.innerHTML = draw(); bind();
+  };
+}
+
+/* ---------- detailed media info ---------- */
+async function sheetMediaInfo() {
+  const v = P.v, it = P.item;
+  const fps = await measureFps();
+  const q = v.getVideoPlaybackQuality?.();
+  const bitrate = it.size && isFinite(v.duration) && v.duration ? (it.size * 8 / v.duration) : 0;
+  const rows = [
+    ['File', it.name], ['Folder', it.folder || '—'],
+    ['Container', it.remote ? '—' : (it.file?.type || it.name.split('.').pop().toUpperCase())],
+    ['Resolution', v.videoWidth ? `${v.videoWidth} × ${v.videoHeight}` : 'Audio only'],
+    ['Frame rate', fps ? `${fps} fps` : '—'],
+    ['Length', fmtTime(v.duration)], ['Size', it.size ? fmtSize(it.size) : '—'],
+    ['Avg. bitrate', bitrate ? (bitrate > 1e6 ? (bitrate / 1e6).toFixed(1) + ' Mbps' : Math.round(bitrate / 1e3) + ' kbps') : '—'],
+    ['Dropped frames', q ? `${q.droppedVideoFrames} of ${q.totalVideoFrames}` : '—'],
+    ['Subtitles', P.cues.length ? `${P.cues.length} lines` : 'None'],
+  ];
+  openSheet('Video details', `<div style="padding:0 20px 8px">${rows.map(([k, val]) =>
+    `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="color:var(--muted);width:110px;flex:none">${k}</span><span style="word-break:break-word">${esc(val)}</span></div>`).join('')}</div>`);
+}
+function measureFps() {
+  const v = P.v;
+  if (!v.requestVideoFrameCallback || v.paused) return Promise.resolve(0);
+  return new Promise(res => {
+    let first = null, n = 0;
+    const to = setTimeout(() => res(0), 1500);
+    const cb = (now, m) => {
+      if (first == null) first = m; n++;
+      if (n >= 12) { clearTimeout(to); const dt = m.mediaTime - first.mediaTime, df = m.presentedFrames - first.presentedFrames;
+        return res(dt > 0 ? Math.round(df / dt * v.playbackRate * 100) / 100 / v.playbackRate : 0); }
+      v.requestVideoFrameCallback(cb);
+    };
+    v.requestVideoFrameCallback(cb);
+  });
+}
+
+/* ---------- record clip (VLC-style record button) ---------- */
+function startRecording() {
+  const v = P.v;
+  const capture = v.captureStream || v.mozCaptureStream;
+  if (!capture || !window.MediaRecorder) return ptoast('Recording isn’t supported in this browser');
+  let stream;
+  try { stream = capture.call(v); } catch { return ptoast('This video can’t be recorded'); }
+  const types = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+  const mime = types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+  let rec;
+  try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 6e6 } : undefined); }
+  catch { return ptoast('This video can’t be recorded'); }
+  const chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.onstop = () => {
+    const type = rec.mimeType || mime || 'video/webm';
+    const ext = type.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(chunks, { type });
+    const name = `${baseName(P.item.name)} clip ${new Date().toTimeString().slice(0, 8).replace(/:/g, '-')}.${ext}`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    const f = new File([blob], name, { type, lastModified: Date.now() });
+    const id = fileId(f);
+    if (!lib.byId.has(id)) {
+      const it = { id, file: f, name, size: f.size, mtime: f.lastModified, folder: 'Recordings', url: null, dur: 0, thumb: null, sub: null };
+      lib.items.push(it); lib.byId.set(id, it); hydrateThumbs();
+    }
+    ptoast(`Clip saved (${fmtTime((Date.now() - P.rec.start) / 1000)}) — also in “Recordings”`);
+    P.rec = null; $('#recpill').hidden = true; clearInterval(P.recTick);
+  };
+  rec.start(1000);
+  P.rec = { rec, start: Date.now() };
+  if (v.paused) v.play().catch(() => {});
+  const pill = $('#recpill'); pill.hidden = false;
+  const tick = () => ($('#recTime').textContent = fmtTime((Date.now() - P.rec.start) / 1000));
+  tick(); P.recTick = setInterval(tick, 500);
+}
+function stopRecording() { try { P.rec?.rec.stop(); } catch {} }
+$('#recpill').onclick = stopRecording;
 function sheetAspect() {
   const b = openSheet('Aspect ratio', ASPECTS.map(([k, l], i) =>
     opt(i, i === P.aspect ? 'i-check' : 'i-aspect', l, '', i === P.aspect ? 'sel' : '')).join(''));

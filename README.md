@@ -28,6 +28,13 @@ An ad-free video player for your phone, built as a Progressive Web App.
 - Subtitles (.srt / .vtt): auto-loaded when they share the video's name, with size, position, background and ±50 ms sync
 - Resume where you left off, auto-play next, repeat one/all
 - Sleep timer, screenshot, picture-in-picture
+- **Record clip** — saves what's playing as a video file (also added to a "Recordings" folder)
+- **A-B repeat**, **jump to time**, **bookmarks** (shown as marks on the seek bar)
+- **Equalizer** with 12 presets and 10 adjustable bands
+- **Audio delay** (saved per video) to fix out-of-sync sound
+- **Video adjustments**: brightness, contrast, saturation, hue, mirror
+- **Video details**: resolution, frame rate, bitrate, dropped frames
+- Screen recordings (WebM files with no stored length) play with a working seek bar
 - Lock-screen / notification media controls; keeps the screen on while playing
 
 **Cache tools (Settings → Storage & cache)**
