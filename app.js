@@ -1,13 +1,22 @@
-/* Open Player — offline, ad-free video player PWA.
+/* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
+const ANDROID_APK_URL = 'https://github.com/adhil-bit/open-palyer/releases/latest';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 const VIDEO_EXT = /\.(mp4|m4v|mkv|webm|mov|avi|3gp|3g2|ts|m2ts|mts|flv|wmv|ogv|mpg|mpeg)$/i;
+const AUDIO_EXT = /\.(mp3|m4a|aac|flac|wav|ogg|oga|opus|wma|amr|aiff?|alac)$/i;
 const SUB_EXT = /\.(srt|vtt)$/i;
+
+/* Running inside the Android app? (Capacitor) */
+const Cap = window.Capacitor;
+const NATIVE = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+const ML = NATIVE ? (Cap.registerPlugin ? Cap.registerPlugin('MediaLibrary') : Cap.Plugins?.MediaLibrary) : null;
+const IS_ANDROID_BROWSER = !NATIVE && /Android/i.test(navigator.userAgent);
+const nativeSrc = (path, uri) => Cap.convertFileSrc(path ? 'file://' + path : uri);
 
 /* ---------------- settings ---------------- */
 const DEFAULTS = {
@@ -91,42 +100,104 @@ function addFiles(fileList, fromFolder = false) {
     const dir = (f.webkitRelativePath || '').split('/').slice(0, -1).join('/');
     subs.set(dir + '/' + baseName(f.name).toLowerCase(), f);
   }
-  let added = 0;
+  let added = 0, songs = 0;
   const today = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   for (const f of files) {
-    const isVideo = (f.type && f.type.startsWith('video/')) || VIDEO_EXT.test(f.name);
-    if (!isVideo) continue;
+    const isAudio = (f.type && f.type.startsWith('audio/')) || AUDIO_EXT.test(f.name);
+    const isVideo = !isAudio && ((f.type && f.type.startsWith('video/')) || VIDEO_EXT.test(f.name));
+    if (!isVideo && !isAudio) continue;
     const id = fileId(f);
     if (lib.byId.has(id)) continue;
     const parts = (f.webkitRelativePath || '').split('/');
     const dir = parts.slice(0, -1).join('/');
     const folder = dir ? parts[parts.length - 2] : (fromFolder ? 'Folder' : `Added ${today}`);
     // auto-attach a subtitle with the same name (VLC-style)
-    const sub = subs.get(dir + '/' + baseName(f.name).toLowerCase())
-      || subs.get(dir + '/' + baseName(baseName(f.name)).toLowerCase()) || null;
-    const it = { id, file: f, name: f.name, size: f.size, mtime: f.lastModified || 0, folder, url: null, dur: 0, thumb: null, sub };
+    const sub = isAudio ? null : (subs.get(dir + '/' + baseName(f.name).toLowerCase())
+      || subs.get(dir + '/' + baseName(baseName(f.name)).toLowerCase()) || null);
+    const it = { id, kind: isAudio ? 'audio' : 'video', file: f, name: f.name, size: f.size, mtime: f.lastModified || 0, folder, url: null, dur: 0, thumb: null, sub };
+    if (isAudio) { it.title = baseName(f.name); it.artist = ''; it.album = folder; songs++; }
     lib.items.push(it); lib.byId.set(id, it); added++;
   }
   if (added) {
-    snack(`${added} video${added > 1 ? 's' : ''} added`);
+    const vids = added - songs;
+    snack([vids && `${vids} video${vids > 1 ? 's' : ''}`, songs && `${songs} song${songs > 1 ? 's' : ''}`].filter(Boolean).join(' and ') + ' added');
     render();
     hydrateThumbs();
   } else if (files.length) {
-    snack('No playable videos found in that selection');
+    snack('No playable videos or music found in that selection');
   }
 }
+
+/* ---------------- Android app: scan the whole device ---------------- */
+let scanning = false, lastScan = 0;
+async function scanDevice(quiet) {
+  if (!NATIVE || scanning) return;
+  scanning = true; lastScan = Date.now();
+  try {
+    const perm = await ML.checkAccess();
+    const wantVideo = perm.video === 'granted', wantAudio = perm.audio === 'granted';
+    if (!wantVideo && !wantAudio) return;
+    const [v, a] = await Promise.all([
+      wantVideo ? ML.listVideos() : { items: [] },
+      wantAudio ? ML.listAudio() : { items: [] },
+    ]);
+    // keep manually-added files, replace everything that came from the device
+    lib.items = lib.items.filter(i => !i.native);
+    lib.byId = new Map(lib.items.map(i => [i.id, i]));
+    for (const m of v.items) {
+      const it = {
+        id: 'ms:' + m.id, kind: 'video', native: true, nuri: m.uri, npath: m.path,
+        src: nativeSrc(m.path, m.uri), name: m.name || 'Video', size: m.size, mtime: m.mtime,
+        folder: m.folder || 'Videos', dur: (m.duration || 0) / 1000, w: m.width, h: m.height,
+        mime: m.mime, thumb: null, sub: null,
+      };
+      lib.items.push(it); lib.byId.set(it.id, it);
+    }
+    for (const m of a.items) {
+      const it = {
+        id: 'ms:' + m.id, kind: 'audio', native: true, nuri: m.uri, npath: m.path,
+        src: nativeSrc(m.path, m.uri), name: m.name || m.title || 'Song',
+        title: m.title || baseName(m.name || 'Song'), artist: cleanTag(m.artist) || 'Unknown artist',
+        album: cleanTag(m.album) || 'Unknown album', albumId: m.albumId,
+        size: m.size, mtime: m.mtime, folder: m.folder || 'Music', dur: (m.duration || 0) / 1000,
+        mime: m.mime, thumb: null,
+      };
+      lib.items.push(it); lib.byId.set(it.id, it);
+    }
+    render();
+    hydrateThumbs();
+    if (!quiet) snack(`Found ${plural(v.items.length, 'video')} and ${plural(a.items.length, 'song')}`);
+    if (S.deepScan && allFiles) deepScan(true);
+  } catch (e) {
+    if (!quiet) snack('Couldn’t read your media library');
+  } finally { scanning = false; }
+}
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const cleanTag = s => (!s || s === '<unknown>') ? '' : s;
 
 /* ---------------- thumbnails ---------------- */
 let thumbBusy = false;
 async function hydrateThumbs() {
   if (thumbBusy) return; thumbBusy = true;
-  for (const it of lib.items) {
-    if (it.thumb || it.thumbTried || !it.file) continue;
+  // Thumbnails for what's on screen first, then everything else.
+  const onScreen = new Set($$('.row[data-id]', listEl).map(r => r.dataset.id));
+  const order = [...lib.items].sort((a, b) => onScreen.has(b.id) - onScreen.has(a.id));
+  for (const it of order) {
+    if (it.thumb || it.thumbTried) continue;
+    if (!it.file && !it.native) continue;
+    if (it.kind === 'audio' && !it.native) continue;     // no artwork reader for manual songs
     it.thumbTried = true;
-    const cached = await idb.get(it.id);
+    const key = it.id + (it.native ? '|' + it.mtime : '');
+    const cached = await idb.get(key);
     if (cached) { Object.assign(it, cached); updateRow(it); continue; }
-    const data = await makeThumb(it.file);
-    if (data) { Object.assign(it, data); idb.set(it.id, data); updateRow(it); }
+    let data = null;
+    if (it.native) {
+      try {
+        const r = await ML.getThumbnail({ uri: it.nuri, path: it.npath, audio: it.kind === 'audio', width: 256 });
+        data = { thumb: r.dataUrl || null, noArt: !r.dataUrl };
+      } catch {}
+    } else data = await makeThumb(it.file);
+    if (data) { Object.assign(it, data); idb.set(key, data); updateRow(it); }
   }
   thumbBusy = false;
 }
@@ -163,17 +234,36 @@ function makeThumb(file) {
 
 /* ---------------- library rendering ---------------- */
 const listEl = $('#list');
-function visibleItems() {
-  let arr = lib.items;
-  if (lib.tab === 'folders' && lib.folder) arr = arr.filter(i => i.folder === lib.folder);
-  if (lib.query) { const q = lib.query.toLowerCase(); arr = arr.filter(i => i.name.toLowerCase().includes(q)); }
-  const key = { name: i => i.name.toLowerCase(), date: i => i.mtime, size: i => i.size, duration: i => i.dur || 0 }[S.sort];
+const isAudio = i => i.kind === 'audio';
+const videoItems = () => lib.items.filter(i => !isAudio(i));
+const audioItems = () => lib.items.filter(isAudio);
+lib.musicView = 'songs';   // songs | albums | artists
+lib.group = null;          // selected album/artist
+
+function sortItems(arr) {
+  const key = { name: i => (i.title || i.name).toLowerCase(), date: i => i.mtime, size: i => i.size, duration: i => i.dur || 0 }[S.sort];
   return [...arr].sort((a, b) => {
     const x = key(a), y = key(b);
     return (x < y ? -1 : x > y ? 1 : 0) * S.sortDir || a.name.localeCompare(b.name, undefined, { numeric: true });
   });
 }
+function matchQuery(i) {
+  if (!lib.query) return true;
+  const q = lib.query.toLowerCase();
+  return [i.name, i.title, i.artist, i.album].some(s => s && s.toLowerCase().includes(q));
+}
+function visibleItems() {
+  if (lib.tab === 'music') {
+    let arr = audioItems().filter(matchQuery);
+    if (lib.group) arr = arr.filter(i => (lib.musicView === 'albums' ? i.album : i.artist) === lib.group);
+    return lib.group && lib.musicView === 'albums' ? arr : sortItems(arr);
+  }
+  let arr = videoItems().filter(matchQuery);
+  if (lib.tab === 'folders' && lib.folder) arr = arr.filter(i => i.folder === lib.folder);
+  return sortItems(arr);
+}
 function rowHTML(it) {
+  if (isAudio(it)) return songRowHTML(it);
   const p = progress[it.id];
   const pct = p && p.d ? clamp(p.t / p.d * 100, 0, 100) : 0;
   const isNew = !p;
@@ -190,21 +280,35 @@ function rowHTML(it) {
     </div>
   </button>`;
 }
+function songRowHTML(it) {
+  const playing = P.item === it && !P.v.paused;
+  return `<button class="row song${playing ? ' playing' : ''}" data-id="${esc(it.id)}">
+    <div class="art${it.thumb ? '' : ' ph'}">${it.thumb ? `<img src="${it.thumb}" alt="" loading="lazy">` : '<svg><use href="#i-note"/></svg>'}${playing ? '<span class="eqbars"><i></i><i></i><i></i></span>' : ''}</div>
+    <div class="meta">
+      <div class="name">${esc(it.title || it.name)}</div>
+      <div class="sub"><span>${esc(it.artist || 'Unknown artist')}</span>${it.dur ? `<span>${fmtTime(it.dur)}</span>` : ''}</div>
+    </div>
+  </button>`;
+}
 function updateRow(it) {
   const el = listEl.querySelector(`.row[data-id="${CSS.escape(it.id)}"]`);
   if (el) el.outerHTML = rowHTML(it);
+  if (P.item === it) updateMini();
 }
+const emptyMsg = t => `<div class="empty" style="position:static;padding:60px 24px"><p>${t}</p></div>`;
 function render() {
-  const has = lib.items.length > 0;
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === lib.tab));
-  const showCrumb = lib.tab === 'folders' && lib.folder;
+  const showCrumb = (lib.tab === 'folders' && lib.folder) || (lib.tab === 'music' && lib.group);
   $('#crumb').hidden = !showCrumb;
-  if (showCrumb) $('#crumbTitle').textContent = lib.folder;
+  if (showCrumb) $('#crumbTitle').textContent = lib.tab === 'music' ? lib.group : lib.folder;
+  $('#musicChips').hidden = lib.tab !== 'music' || !!lib.group;
+  $$('#musicChips button').forEach(b => b.classList.toggle('sel', b.dataset.mv === lib.musicView));
 
   let html = '';
+  $('#empty').hidden = true;
   if (lib.tab === 'recent') {
     const list = recents.filter(r => !lib.query || r.name.toLowerCase().includes(lib.query.toLowerCase()));
-    if (!list.length) html = `<div class="empty" style="position:static;padding:60px 24px"><p>Videos you watch show up here.</p></div>`;
+    if (!list.length) html = emptyMsg('Videos and songs you play show up here.');
     for (const r of list) {
       const it = lib.byId.get(r.id);
       if (it) { html += rowHTML(it); continue; }
@@ -215,30 +319,59 @@ function render() {
       </button>`;
     }
     listEl.innerHTML = html;
-    $('#empty').hidden = true;
     return;
   }
-  $('#empty').hidden = has;
-  if (!has) { listEl.innerHTML = ''; return; }
 
+  if (lib.tab === 'music') {
+    const songs = audioItems();
+    if (!songs.length) {
+      listEl.innerHTML = `<div class="empty" style="position:static;padding:50px 24px">
+        <div class="empty-art"><svg><use href="#i-music"/></svg></div><h2>No music yet</h2>
+        <p>${NATIVE ? 'Allow music access to see every song on your phone, or add songs yourself.' : 'Add songs or a music folder from your phone.'}</p>
+        <div class="empty-actions">${NATIVE && !hasAccess('audio') ? '<button class="btn primary" data-act="grant">Allow music access</button>' : ''}<button class="btn${NATIVE && !hasAccess('audio') ? '' : ' primary'}" data-act="addMusic"><svg><use href="#i-plus"/></svg>Add music</button></div></div>`;
+      return;
+    }
+    if (lib.musicView !== 'songs' && !lib.group && !lib.query) {
+      const key = lib.musicView === 'albums' ? 'album' : 'artist';
+      const groups = new Map();
+      for (const s of songs) {
+        const g = groups.get(s[key]) || { n: 0, art: null, artist: s.artist };
+        g.n++; if (!g.art && s.thumb) g.art = s.thumb;
+        groups.set(s[key], g);
+      }
+      for (const [name, g] of [...groups].sort((a, b) => String(a[0]).localeCompare(String(b[0])))) {
+        html += `<button class="row" data-group="${esc(name)}">
+          <div class="art${key === 'artist' ? ' round' : ''}${g.art ? '' : ' ph'}">${g.art ? `<img src="${g.art}" alt="" loading="lazy">` : `<svg><use href="#${key === 'album' ? 'i-disc' : 'i-user'}"/></svg>`}</div>
+          <div class="meta"><div class="name">${esc(name)}</div><div class="sub"><span>${key === 'album' ? esc(g.artist || '') + ' · ' : ''}${g.n} song${g.n > 1 ? 's' : ''}</span></div></div>
+          <svg class="chev"><use href="#i-chev"/></svg></button>`;
+      }
+    } else {
+      const items = visibleItems();
+      html = items.length ? `<button class="playall" data-act="playall"><svg><use href="#i-play"/></svg>Play all · ${items.length}</button>` + items.map(songRowHTML).join('') : emptyMsg('No matches.');
+    }
+    listEl.innerHTML = html;
+    return;
+  }
+
+  const vids = videoItems();
+  if (!vids.length) { $('#empty').hidden = false; listEl.innerHTML = ''; return; }
   if (lib.tab === 'folders' && !lib.folder && !lib.query) {
     const groups = new Map();
-    for (const it of lib.items) {
-      const g = groups.get(it.folder) || { n: 0, size: 0, fresh: 0 };
-      g.n++; g.size += it.size; if (!progress[it.id]) g.fresh++;
+    for (const it of vids) {
+      const g = groups.get(it.folder) || { n: 0, size: 0, fresh: 0, hidden: 0 };
+      g.n++; g.size += it.size || 0; if (!progress[it.id]) g.fresh++; if (it.hidden) g.hidden++;
       groups.set(it.folder, g);
     }
     for (const [name, g] of [...groups].sort((a, b) => a[0].localeCompare(b[0]))) {
       html += `<button class="row" data-folder="${esc(name)}">
         <div class="folder-ico"><svg><use href="#i-folder"/></svg></div>
         <div class="meta"><div class="name">${esc(name)}</div>
-          <div class="sub"><span>${g.n} video${g.n > 1 ? 's' : ''}</span><span>${fmtSize(g.size)}</span>${g.fresh ? `<span class="badge">${g.fresh} NEW</span>` : ''}</div></div>
+          <div class="sub"><span>${g.n} video${g.n > 1 ? 's' : ''}</span><span>${fmtSize(g.size)}</span>${g.fresh ? `<span class="badge">${g.fresh} NEW</span>` : ''}${g.hidden ? '<span class="badge hid">HIDDEN</span>' : ''}</div></div>
         <svg class="chev"><use href="#i-chev"/></svg>
       </button>`;
     }
   } else {
-    const items = visibleItems();
-    html = items.map(rowHTML).join('') || `<div class="empty" style="position:static;padding:60px 24px"><p>No matches.</p></div>`;
+    html = visibleItems().map(rowHTML).join('') || emptyMsg('No matches.');
   }
   listEl.innerHTML = html;
 }
@@ -254,8 +387,13 @@ listEl.addEventListener('scroll', () => { if (rowPress !== 'fired') clearTimeout
 listEl.addEventListener('contextmenu', e => e.preventDefault());
 listEl.addEventListener('click', e => {
   if (rowPress === 'fired') { rowPress = null; return; }
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  if (act === 'grant') return requestMediaAccess();
+  if (act === 'addMusic') return $('#pickMusic').click();
+  if (act === 'playall') { const q = visibleItems(); if (q.length) openPlayer(q[0], q); return; }
   const row = e.target.closest('.row'); if (!row) return;
   if (row.dataset.folder) { lib.folder = row.dataset.folder; render(); listEl.scrollTop = 0; return; }
+  if (row.dataset.group) { lib.group = row.dataset.group; render(); listEl.scrollTop = 0; return; }
   if (row.dataset.recent) {
     snack('Re-add this file to keep watching from where you left off', 'Add', () => $('#pickFiles').click());
     return;
@@ -264,14 +402,15 @@ listEl.addEventListener('click', e => {
   if (it) openPlayer(it, visibleQueueFor(it));
 });
 function visibleQueueFor(it) {
-  if (lib.tab === 'recent') return recents.map(r => lib.byId.get(r.id)).filter(Boolean);
-  if (lib.tab === 'folders') return visibleItems().length && lib.folder ? visibleItems() : lib.items.filter(i => i.folder === it.folder);
+  if (lib.tab === 'recent') return recents.map(r => lib.byId.get(r.id)).filter(i => i && i.kind === it.kind);
+  if (lib.tab === 'folders') return lib.folder ? visibleItems() : videoItems().filter(i => i.folder === it.folder);
   return visibleItems();
 }
+$$('#musicChips button').forEach(b => b.onclick = () => { lib.musicView = b.dataset.mv; lib.group = null; render(); listEl.scrollTop = 0; });
 
 /* tabs, search, sort, pickers */
-$$('.tab').forEach(t => t.onclick = () => { lib.tab = t.dataset.tab; lib.folder = null; render(); listEl.scrollTop = 0; });
-$('#btnCrumbBack').onclick = () => { lib.folder = null; render(); };
+$$('.tab').forEach(t => t.onclick = () => { lib.tab = t.dataset.tab; lib.folder = null; lib.group = null; render(); listEl.scrollTop = 0; hydrateThumbs(); });
+$('#btnCrumbBack').onclick = () => { lib.folder = null; lib.group = null; render(); };
 $('#btnSearch').onclick = () => { $('#searchbar').hidden = false; $('#searchInput').focus(); };
 $('#btnSearchClose').onclick = () => { $('#searchbar').hidden = true; $('#searchInput').value = ''; lib.query = ''; render(); };
 $('#searchInput').oninput = e => { lib.query = e.target.value.trim(); render(); };
@@ -279,6 +418,7 @@ $('#fab').onclick = () => sheetAdd();
 $$('[data-pick]').forEach(b => b.onclick = () => (b.dataset.pick === 'folder' ? $('#pickFolder') : $('#pickFiles')).click());
 $('#pickFiles').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
 $('#pickFolder').onchange = e => { addFiles(e.target.files, true); e.target.value = ''; };
+$('#pickMusic').onchange = e => { addFiles(e.target.files); e.target.value = ''; lib.tab = 'music'; render(); };
 $('#btnSort').onclick = sheetSort;
 $('#btnSettings').onclick = sheetSettings;
 
@@ -357,7 +497,18 @@ async function storageInfo() {
 }
 async function sheetSettings() {
   const resumeLbl = { always: 'Always', ask: 'Ask', never: 'Off' };
-  const draw = (info) => `
+  const accessLbl = hasAccess('video') || hasAccess('audio') ? 'Allowed' : 'Not allowed';
+  const mediaSection = NATIVE ? `
+    <div class="group">Your media</div>
+    ${opt('access', 'i-folder', 'Show all videos &amp; music<small>Lets Open Player list everything on your phone</small>', `<span class="val">${accessLbl}</span>`)}
+    ${opt('deep', 'i-search', 'Find videos in hidden folders<small>Folders apps hide from players (.nomedia). Needs “All files access”.</small>', sw(S.deepScan && allFiles))}
+    ${opt('rescan', 'i-refresh', 'Rescan phone now')}
+    ${opt('tghelp', 'i-info', 'Telegram / Plus downloads not showing?')}`
+    : `
+    <div class="group">Your media</div>
+    ${opt('getapp', 'i-android', 'Get the Android app<small>Shows every video and song on your phone automatically</small>', '<span class="val">Recommended</span>')}
+    ${opt('tghelp', 'i-info', 'Telegram / Plus downloads not showing?')}`;
+  const draw = (info) => `${mediaSection}
     <div class="group">Playback</div>
     ${opt('resume', 'i-loop', 'Resume where you left off', `<span class="val">${resumeLbl[S.resume]}</span>`)}
     ${opt('autoNext', 'i-next', 'Auto-play next video', sw(S.autoNext))}
@@ -393,6 +544,14 @@ async function sheetSettings() {
       recents = []; store.del('progress'); store.del('recents'); render(); snack('Watch history cleared');
     }
     if (o === 'update') { closeSheet(); return checkForUpdate(true); }
+    if (o === 'access') {
+      if (hasAccess('video') || hasAccess('audio')) { closeSheet(); return snack('Access is on. To turn it off, use Android settings.', 'Open', () => ML.openAppSettings(), 5000); }
+      closeSheet(); return requestMediaAccess();
+    }
+    if (o === 'deep') { closeSheet(); return toggleDeepScan(); }
+    if (o === 'rescan') { closeSheet(); await scanDevice(); return; }
+    if (o === 'tghelp') { closeSheet(); return sheetTelegramHelp(); }
+    if (o === 'getapp') { window.open(ANDROID_APK_URL, '_blank', 'noopener'); return; }
     saveSettings(); redraw();
   };
 }
@@ -499,10 +658,20 @@ function openPlayer(item, queue) {
   P.idx = Math.max(0, P.queue.indexOf(item));
   P.el.hidden = false;
   document.documentElement.style.background = '#000';
-  try { document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {}); } catch {}
+  hideMini();
+  if (item.kind !== 'audio') enterFullscreen();
   if (!history.state?.player) history.pushState({ player: 1 }, '');
   load(item);
   showControls();
+}
+function enterFullscreen() {
+  if (NATIVE) { ML.setImmersive({ on: true }).catch(() => {}); return; }
+  try { document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {}); } catch {}
+}
+function exitFullscreen() {
+  if (NATIVE) { ML.setImmersive({ on: false }).catch(() => {}); ML.setOrientation({ orientation: 'auto' }).catch(() => {}); return; }
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  try { screen.orientation.unlock(); } catch {}
 }
 function load(item, startAt) {
   saveProgress(true);
@@ -511,9 +680,11 @@ function load(item, startAt) {
   P.zoom = 1;
   if (item.remote && P.boost) freshVideo();
   if (item.remote) P.v.src = item.url;
+  else if (item.src) P.v.src = item.src;
   else { item.url ||= URL.createObjectURL(item.file); P.v.src = item.url; }
+  setAudioView(item);
   P.v.playbackRate = S.defaultSpeed;
-  $('#vTitle').textContent = item.name;
+  $('#vTitle').textContent = item.kind === 'audio' ? (item.title || item.name) : item.name;
   $('#vSub').textContent = P.queue.length > 1 ? `${P.idx + 1} of ${P.queue.length} · ${item.folder}` : (item.folder || '');
   $('#btnPrev').disabled = P.idx <= 0; $('#btnPrev').style.opacity = P.idx <= 0 ? .35 : 1;
   $('#btnNext').disabled = P.idx >= P.queue.length - 1; $('#btnNext').style.opacity = P.idx >= P.queue.length - 1 ? .35 : 1;
@@ -551,7 +722,7 @@ function onMeta() {
   }
   if (it && !it.remote) { it.dur = v.duration; it.w = v.videoWidth; it.h = v.videoHeight; }
   $('#tDur').textContent = fmtTime(v.duration);
-  if (v.videoWidth === 0 && v.videoHeight === 0) ptoast('Video codec not supported here — playing audio only');
+  if (it.kind !== 'audio' && v.videoWidth === 0 && v.videoHeight === 0) ptoast('Video codec not supported here — playing audio only');
   applyAspect();
   autoOrient();
   const p = progress[it.id];
@@ -576,6 +747,7 @@ function videoTransform() {
 }
 function onTime() {
   if (P.ab.b != null && P.v.currentTime >= P.ab.b) P.v.currentTime = P.ab.a;
+  if (!$('#mini').hidden) updateMini();
   updateSeek();
   renderSub();
   const now = performance.now();
@@ -594,6 +766,8 @@ function onPlayState() {
   $('#btnPlay use').setAttribute('href', playing ? '#i-pause' : '#i-play');
   $('#btnPlay').setAttribute('aria-label', playing ? 'Pause' : 'Play');
   if (navigator.mediaSession) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+  updateMini();
+  if (P.item?.kind === 'audio' && P.el.hidden) render();
   if (playing) { keepAwake(true); scheduleHide(); } else { keepAwake(false); showControls(true); saveProgress(true); }
 }
 function onEnded() {
@@ -626,17 +800,53 @@ function touchRecent(it) {
 
 function closePlayer(fromPop) {
   saveProgress(true);
-  P.v.pause();
+  const keepMusic = P.item?.kind === 'audio' && !P.v.paused;
+  if (!keepMusic) { P.v.pause(); clearSleep(); }
   P.el.hidden = true; closeSheet();
   setLock(false);
-  clearSleep();
   document.documentElement.style.background = '';
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  try { screen.orientation.unlock(); } catch {}
+  exitFullscreen();
   if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
   if (!fromPop && history.state?.player) history.back();
+  if (keepMusic) showMini();
   render();
 }
+
+/* ---------- music: artwork view + mini player ---------- */
+function setAudioView(item) {
+  const audio = item.kind === 'audio';
+  P.el.classList.toggle('audio', audio);
+  $('#audioview').hidden = !audio;
+  P.v.style.visibility = audio ? 'hidden' : '';
+  if (!audio) return;
+  $('#avTitle').textContent = item.title || item.name;
+  $('#avSub').textContent = [item.artist, item.album].filter(Boolean).join(' · ');
+  const art = $('#avArt');
+  art.classList.toggle('ph', !item.thumb);
+  art.innerHTML = item.thumb ? `<img src="${item.thumb}" alt="">` : '<svg><use href="#i-note"/></svg>';
+  $('#avBg').style.backgroundImage = item.thumb ? `url("${item.thumb}")` : 'none';
+}
+function showMini() { $('#mini').hidden = false; document.body.classList.add('has-mini'); updateMini(); }
+function hideMini() { $('#mini').hidden = true; document.body.classList.remove('has-mini'); }
+function updateMini() {
+  if ($('#mini').hidden || !P.item) return;
+  const it = P.item;
+  $('#miniTitle').textContent = it.title || it.name;
+  $('#miniSub').textContent = it.artist || it.folder || '';
+  const art = $('#miniArt'); art.classList.toggle('ph', !it.thumb);
+  art.innerHTML = it.thumb ? `<img src="${it.thumb}" alt="">` : '<svg><use href="#i-note"/></svg>';
+  $('#miniPlay use').setAttribute('href', P.v.paused ? '#i-play' : '#i-pause');
+  $('#miniProg').style.width = P.v.duration ? (P.v.currentTime / P.v.duration * 100) + '%' : '0';
+}
+$('#miniOpen').onclick = () => {
+  hideMini();
+  P.el.hidden = false; document.documentElement.style.background = '#000';
+  if (!history.state?.player) history.pushState({ player: 1 }, '');
+  showControls();
+};
+$('#miniPlay').onclick = () => { togglePlay(); setTimeout(updateMini, 50); };
+$('#miniNext').onclick = () => { next(); setTimeout(updateMini, 300); };
+$('#miniClose').onclick = () => { P.v.pause(); clearSleep(); hideMini(); render(); };
 window.addEventListener('popstate', () => {
   if (!sheet.hidden) { closeSheet(); if (!P.el.hidden) history.pushState({ player: 1 }, ''); return; }
   if (!P.el.hidden) closePlayer(true);
@@ -716,12 +926,19 @@ $('#btnRotate').onclick = () => {
   ptoast({ auto: 'Rotation: auto', landscape: 'Rotation: landscape', portrait: 'Rotation: portrait' }[P.rotate]);
 };
 $('#btnPip').onclick = async () => {
+  if (NATIVE) {
+    try { hideControls(); await ML.enterPip({ width: P.v.videoWidth || 16, height: P.v.videoHeight || 9 }); }
+    catch { ptoast('Picture-in-picture isn’t available on this phone'); }
+    return;
+  }
   try {
     if (document.pictureInPictureElement) await document.exitPictureInPicture();
     else await P.v.requestPictureInPicture();
   } catch { ptoast('Picture-in-picture isn’t available here'); }
 };
-if (!document.pictureInPictureEnabled) $('#btnPip').hidden = true;
+if (!NATIVE && !document.pictureInPictureEnabled) $('#btnPip').hidden = true;
+// In Android picture-in-picture the window is tiny: hide controls while it lasts.
+window.addEventListener('resize', () => { if (NATIVE && !P.el.hidden && innerWidth < 300) hideControls(); });
 
 function setLock(on) {
   P.locked = on;
@@ -757,8 +974,14 @@ function applyAspect() {
 window.addEventListener('resize', () => { if (!P.el.hidden) applyAspect(); });
 
 function autoOrient(force) {
-  const o = screen.orientation; if (!o?.lock) return;
+  if (P.item?.kind === 'audio') return;
   let want = P.rotate;
+  if (NATIVE) {
+    if (want === 'auto') want = (!force && !P.v.videoWidth) ? 'auto' : (P.v.videoWidth >= P.v.videoHeight ? 'landscape' : 'portrait');
+    ML.setOrientation({ orientation: want }).catch(() => {});
+    return;
+  }
+  const o = screen.orientation; if (!o?.lock) return;
   if (want === 'auto') {
     if (!force && !P.v.videoWidth) return;
     want = P.v.videoWidth >= P.v.videoHeight ? 'landscape' : 'portrait';
@@ -1289,8 +1512,7 @@ function startRecording() {
     const ext = type.includes('mp4') ? 'mp4' : 'webm';
     const blob = new Blob(chunks, { type });
     const name = `${baseName(P.item.name)} clip ${new Date().toTimeString().slice(0, 8).replace(/:/g, '-')}.${ext}`;
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    saveBlob(blob, name);
     const f = new File([blob], name, { type, lastModified: Date.now() });
     const id = fileId(f);
     if (!lib.byId.has(id)) {
@@ -1331,6 +1553,19 @@ function sheetSleep() {
 }
 function clearSleep() { if (P.sleep) clearTimeout(P.sleep.t); P.sleep = null; P.sleepEnd = false; }
 
+/* Save a file: Android app → phone's Pictures/Movies "Open Player" folder; browser → download. */
+async function saveBlob(blob, name) {
+  if (NATIVE) {
+    try {
+      const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
+      await ML.saveFile({ name, mime: blob.type || 'application/octet-stream', base64: b64 });
+      return blob.type.startsWith('image/') ? 'Pictures › Open Player' : 'Movies › Open Player';
+    } catch { ptoast('Couldn’t save the file'); return null; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  return null;
+}
 function screenshot() {
   const v = P.v; if (!v.videoWidth) return ptoast('Nothing to capture');
   try {
@@ -1338,11 +1573,8 @@ function screenshot() {
     c.getContext('2d').drawImage(v, 0, 0);
     c.toBlob(b => {
       if (!b) return ptoast('Screenshot not allowed for this stream');
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(b);
-      a.download = `${baseName(P.item.name)}_${fmtTime(v.currentTime).replace(/:/g, '-')}.png`;
-      a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      ptoast('Screenshot saved');
+      saveBlob(b, `${baseName(P.item.name)}_${fmtTime(v.currentTime).replace(/:/g, '-')}.png`)
+        .then(where => ptoast(where ? `Screenshot saved to ${where}` : 'Screenshot saved'));
     }, 'image/png');
   } catch { ptoast('Screenshot not allowed for this stream'); }
 }
@@ -1401,6 +1633,7 @@ applySubStyle();
 
 /* --- wake lock, media session --- */
 async function keepAwake(on) {
+  if (NATIVE) { ML.keepAwake({ on: on && S.keepAwake }).catch(() => {}); return; }
   try {
     if (on && S.keepAwake && 'wakeLock' in navigator) { if (!P.wake) P.wake = await navigator.wakeLock.request('screen'); P.wake.onrelease = () => (P.wake = null); }
     else if (!on && P.wake) { await P.wake.release(); P.wake = null; }
@@ -1432,7 +1665,7 @@ function setupMediaSession() {
    SERVICE WORKER, UPDATES, SHARE TARGET
    ================================================================= */
 async function setupSW() {
-  if (!('serviceWorker' in navigator)) return;
+  if (NATIVE || !('serviceWorker' in navigator)) return;
   try {
     const reg = await navigator.serviceWorker.register('sw.js');
     const prompt = w => snack('A new version of Open Player is ready', 'Reload', () => w.postMessage('SKIP_WAITING'), 0);
@@ -1489,9 +1722,155 @@ if ('launchQueue' in window) {
 document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); });
 
+/* =================================================================
+   ANDROID APP: media access, hidden folders, "Open with"
+   ================================================================= */
+let access = { video: 'prompt', audio: 'prompt' }, allFiles = false;
+function hasAccess(k) { return access[k] === 'granted'; }
+async function refreshAccess() {
+  if (!NATIVE) return;
+  try { access = await ML.checkAccess(); } catch {}
+  try { allFiles = (await ML.checkAllFiles()).granted; } catch {}
+}
+async function requestMediaAccess() {
+  if (!NATIVE) { window.open(ANDROID_APK_URL, '_blank', 'noopener'); return; }
+  try {
+    access = await ML.requestAccess({ types: ['video', 'audio'] });
+    if (hasAccess('video') || hasAccess('audio')) { S.mediaMode = 'full'; saveSettings(); await scanDevice(); }
+    else if (access.video === 'denied') snack('Permission is turned off for Open Player', 'Open settings', () => ML.openAppSettings(), 7000);
+    else snack('No problem — you can add files yourself anytime', 'Add', () => sheetAdd(), 5000);
+  } catch { snack('Couldn’t ask for permission'); }
+  render();
+}
+
+async function toggleDeepScan() {
+  if (S.deepScan && allFiles) {
+    S.deepScan = false; saveSettings();
+    lib.items = lib.items.filter(i => !i.deep); lib.byId = new Map(lib.items.map(i => [i.id, i]));
+    render(); return snack('Hidden-folder search turned off');
+  }
+  S.deepScan = true; saveSettings();
+  if (allFiles) return deepScan();
+  const b = openSheet('Find hidden videos', `
+    <div style="padding:0 20px 8px;color:var(--muted);font-size:14px;line-height:1.5">
+      <p style="margin:0 0 10px">Some apps put videos in folders marked “hidden” so normal players skip them. To look inside those folders, Android needs you to turn on <b style="color:var(--text)">All files access</b> for Open Player.</p>
+      <p style="margin:0">Open Player only reads videos and music. Nothing is changed, deleted or uploaded.</p>
+    </div>
+    ${opt('go', 'i-folder', 'Open Android settings<small>Turn on “Allow access to manage all files”, then come back</small>')}
+    ${opt('cancel', 'i-close', 'Not now')}`);
+  b.onclick = async e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    closeSheet();
+    if (o === 'cancel') { S.deepScan = false; saveSettings(); return; }
+    try { const r = await ML.requestAllFiles(); if (r.granted) { allFiles = true; deepScan(); } } catch {}
+  };
+}
+async function deepScan(quiet) {
+  if (!NATIVE) return;
+  if (!allFiles) { try { allFiles = (await ML.checkAllFiles()).granted; } catch {} if (!allFiles) return; }
+  if (!quiet) snack('Searching hidden folders…', null, null, 0);
+  try {
+    const r = await ML.deepScan();
+    const known = new Set(lib.items.filter(i => i.npath && !i.deep).map(i => i.npath));
+    lib.items = lib.items.filter(i => !i.deep);
+    lib.byId = new Map(lib.items.map(i => [i.id, i]));
+    let n = 0, hiddenN = 0;
+    for (const m of r.items) {
+      if (known.has(m.path)) continue;            // already listed by Android's media library
+      const it = {
+        id: 'fs:' + m.path, kind: m.kind, native: true, deep: true, hidden: m.hidden,
+        npath: m.path, nuri: null, src: nativeSrc(m.path), name: m.name, size: m.size, mtime: m.mtime,
+        folder: m.folder || 'Hidden', dur: 0, thumb: null, sub: null,
+      };
+      if (m.kind === 'audio') Object.assign(it, { title: baseName(m.name), artist: 'Unknown artist', album: m.folder || 'Unknown album' });
+      lib.items.push(it); lib.byId.set(it.id, it); n++; if (m.hidden) hiddenN++;
+    }
+    render(); hydrateThumbs();
+    if (!quiet || n) snack(n ? `Found ${n} more file${n > 1 ? 's' : ''}${hiddenN ? ` (${hiddenN} in hidden folders)` : ''}` : 'No extra files found in hidden folders');
+  } catch { if (!quiet) snack('Couldn’t search hidden folders'); }
+}
+
+function sheetTelegramHelp() {
+  openSheet('Can’t find Telegram downloads?', `
+    <div class="help">
+      <p>Newer versions of <b>Telegram</b> and <b>Plus Messenger</b> keep downloads in their own private storage. Android doesn’t let any other app open that folder — not Open Player, VLC or MX Player. Here’s how to get them:</p>
+      <h4>1 · Play it straight away (no re-download)</h4>
+      <p>In Telegram, open the video, tap <b>⋮</b> and choose <b>Share</b> or <b>Open with</b>, then pick <b>Open Player</b>.${NATIVE ? '' : ' (Needs the Open Player Android app.)'}</p>
+      <h4>2 · Make them show up here automatically</h4>
+      <p>Use <b>Save to Downloads</b> or <b>Save to Gallery</b> on a video. It’s copied to your phone’s shared storage (usually <i>Download › Telegram</i>), and Open Player lists it on the next scan. Telegram also has an automatic “Save to Gallery” option in <i>Settings › Data and Storage</i>.</p>
+      <h4>3 · Stop having to download again</h4>
+      <p>Telegram clears its cache to save space. In Telegram go to <i>Settings › Data and Storage › Storage Usage</i> and set <b>Keep Media</b> to <b>Forever</b>.</p>
+      <p class="note">Menu names can differ slightly between Telegram versions and Plus Messenger.</p>
+    </div>
+    ${NATIVE ? opt('rescan', 'i-refresh', 'Rescan phone now') : opt('getapp', 'i-android', 'Get the Android app', '<span class="val">Recommended</span>')}`)
+    .onclick = e => {
+      const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+      closeSheet();
+      if (o === 'rescan') scanDevice();
+      if (o === 'getapp') window.open(ANDROID_APK_URL, '_blank', 'noopener');
+    };
+}
+
+/* files opened from other apps ("Open with" / Share → Open Player) */
+function handleOpenFile(f) {
+  if (!f?.uri) return;
+  const kind = (f.mime || '').startsWith('audio/') || AUDIO_EXT.test(f.name || '') ? 'audio' : 'video';
+  const id = 'in:' + f.uri;
+  let it = lib.byId.get(id);
+  if (!it) {
+    it = { id, kind, native: true, nuri: f.uri, npath: null, src: Cap.convertFileSrc(f.uri), name: f.name || 'Shared file',
+      title: f.name ? baseName(f.name) : 'Shared file', size: f.size || 0, mtime: Date.now(), folder: 'Opened from other apps', dur: 0, thumb: null };
+    lib.items.push(it); lib.byId.set(id, it);
+  }
+  if (!P.el.hidden) closePlayer(true);
+  openPlayer(it, [it]);
+}
+
+/* first run */
+function showOnboarding() {
+  $('#onboard').hidden = false;
+  if (!NATIVE) {
+    $('#obFullTitle').textContent = 'Get the Android app';
+    $('#obFullText').textContent = 'Browsers can’t list the videos on your phone. The free Open Player app asks for permission once, then shows all your videos and music automatically.';
+    $('#obFull svg use').setAttribute('href', '#i-android');
+    $('#obFoot').textContent = 'Or keep using this web version and add files yourself. You can change this anytime in Settings.';
+  }
+}
+$('#obFull').onclick = async () => {
+  S.onboarded = true; saveSettings();
+  if (!NATIVE) { window.open(ANDROID_APK_URL, '_blank', 'noopener'); $('#onboard').hidden = true; return; }
+  $('#onboard').hidden = true;
+  await requestMediaAccess();
+};
+$('#obManual').onclick = () => {
+  S.onboarded = true; S.mediaMode = 'manual'; saveSettings();
+  $('#onboard').hidden = true; render();
+};
+
+if (NATIVE) {
+  try { ML.addListener('openFile', handleOpenFile); } catch {}
+  // Coming back from Android settings (or another app): pick up permission changes and new files.
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return;
+    const before = JSON.stringify(access) + allFiles;
+    await refreshAccess();
+    const changed = before !== JSON.stringify(access) + allFiles;
+    if ((hasAccess('video') || hasAccess('audio')) && (changed || Date.now() - lastScan > 60000)) scanDevice(!changed);
+    else if (changed && S.deepScan && allFiles) deepScan();
+  });
+}
+
 /* ---------------- boot ---------------- */
 render();
 setupSW();
 importShared();
+(async () => {
+  if (NATIVE) {
+    await refreshAccess();
+    if (hasAccess('video') || hasAccess('audio')) { S.onboarded = true; saveSettings(); scanDevice(true); }
+    try { const r = await ML.getLaunchFile(); if (r.file) handleOpenFile(r.file); } catch {}
+  }
+  if (!S.onboarded && (NATIVE || IS_ANDROID_BROWSER)) showOnboarding();
+})();
 if (store.get('justRefreshed', false)) { store.del('justRefreshed'); setTimeout(() => snack('App cache refreshed — you’re on the latest files'), 300); }
 window.OpenPlayer = { lib, P, S, version: APP_VERSION };

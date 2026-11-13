@@ -1,6 +1,6 @@
 # Open Player
 
-An ad-free video player for your phone, built as a Progressive Web App.
+An ad-free video and music player for your phone — as an **Android app** (recommended) or a web app.
 **No ads. No tracking. Nothing uploaded** — your videos are played straight from your device.
 
 ## Features
@@ -42,10 +42,35 @@ An ad-free video player for your phone, built as a Progressive Web App.
 - Clear thumbnail cache, clear watch history
 - Shows storage used; an update banner appears when a new version is deployed
 
-## Install on your phone
+## Android app (recommended)
+
+The Android app asks for permission once and then lists **every video and song on your phone**, like other players do.
+
+**Install:** open [Releases](https://github.com/adhil-bit/open-palyer/releases/latest) on your phone, download the `OpenPlayer-x.y.z.apk`, and open it. Android asks to allow installs from your browser or file manager the first time.
+
+Every push to `main` builds a new APK automatically (GitHub Actions → *Android APK*), and it installs over the previous one.
+
+On first launch you choose:
+- **Show all my videos & music** (recommended) — grants Android's media permission; everything is listed automatically.
+- **I'll add files myself** — no permission; pick files or folders when you want.
+
+Extra in the app:
+- **Find videos in hidden folders** (Settings) — with the optional *All files access* permission, finds videos inside folders apps hide from players (`.nomedia` / dot-folders).
+- **Open with / Share → Open Player** from any app (file managers, Telegram, etc.).
+- Music tab with Songs / Albums / Artists, album art, and a mini player that keeps playing while you browse.
+- Screenshots and recorded clips are saved to *Pictures › Open Player* and *Movies › Open Player*.
+
+### Telegram / Plus Messenger downloads
+
+Newer Telegram versions keep downloads in their own private storage (`Android/data/org.telegram.messenger`), which Android doesn't let **any** other app read — including VLC and MX Player. To watch them in Open Player:
+1. In Telegram, open the video → ⋮ → **Share** / **Open with** → **Open Player** (plays immediately, no re-download), or
+2. Use **Save to Downloads / Save to Gallery** so a copy lands in shared storage, where Open Player finds it.
+3. To stop re-downloading: Telegram → Settings → Data and Storage → Storage Usage → **Keep Media: Forever**.
+
+## Web app
 
 1. Host the folder over HTTPS (GitHub Pages works — see below).
-2. Open the link in Chrome on Android → menu → **Install app** / **Add to Home screen**.
+2. Open the link in Chrome → menu → **Install app** / **Add to Home screen**.
 
 ## Deploy with GitHub Pages
 
@@ -55,7 +80,7 @@ An ad-free video player for your phone, built as a Progressive Web App.
 
 ## Releasing an update
 
-Bump the version in **both** `sw.js` (`VERSION`) and `app.js` (`APP_VERSION`), then push.
+Bump the version in **both** `sw.js` (`VERSION`) and `app.js` (`APP_VERSION`), then push. The APK build runs on the same push.
 Installed apps will show "A new version is ready — Reload". Users can also force it with
 **Settings → Refresh app cache**.
 
@@ -74,3 +99,6 @@ Installed apps will show "A new version is ready — Reload". Users can also for
 | `app.js` | Library, player, gestures, subtitles, settings |
 | `sw.js` | Offline cache, updates, share target |
 | `manifest.webmanifest` | Install info, share target, file handling |
+| `android/` | Android app (Capacitor); native media code in `MediaLibraryPlugin.java` |
+| `scripts/build-www.mjs` | Copies the web app into the Android build |
+| `.github/workflows/android.yml` | Builds the APK and publishes it to Releases |
