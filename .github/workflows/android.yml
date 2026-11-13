@@ -28,11 +28,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      # The runner already has the Android SDK. Only install platform-tools:
-      # the action's default also asks for the old "tools" package, which Google removed.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
+      # GitHub's Ubuntu runners already include the Android SDK (ANDROID_HOME).
+      # Just accept the licenses so Gradle can fetch any missing platform/build-tools.
+      - name: Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: Install
         run: npm ci
