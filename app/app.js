@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const ANDROID_APK_URL = 'https://github.com/adhil-bit/open-palyer/releases/latest';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];

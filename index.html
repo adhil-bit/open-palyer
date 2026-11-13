@@ -2,238 +2,493 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Open Player — the video &amp; music player with no ads</title>
+  <meta name="description" content="Open Player is a free video and music player with no ads and no tracking. Use it as an Android app or straight from your browser on any device.">
   <meta name="theme-color" content="#0f1115">
-  <meta name="description" content="Open Player — an offline video player for your phone.">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Open Player</title>
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="app/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="app/icons/icon-192.png">
+  <meta property="og:title" content="Open Player — no ads, no tracking">
+  <meta property="og:description" content="A free video & music player for Android and any browser. Your files never leave your device.">
+  <meta property="og:image" content="app/icons/icon-512.png">
+  <script>
+    // Opened from an installed home-screen app made before the move? Go straight to the player.
+    if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) location.replace('app/');
+  </script>
+  <style>
+    :root {
+      --bg: #0f1115; --surface: #171a21; --surface-2: #1f232c; --line: #2a2f3a;
+      --text: #eef0f4; --muted: #9aa1ae; --accent: #ff8a3d; --accent-2: #ffb066; --ink: #1a0d03;
+      --good: #46d39a; --bad: #ff6b6b; --radius: 18px;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    svg { width: 24px; height: 24px; flex: none; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 72px 0; }
+    h2 { font-size: clamp(26px, 4vw, 38px); line-height: 1.15; letter-spacing: -.02em; margin: 0 0 12px; }
+    .kicker { color: var(--accent); font-weight: 800; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 10px; }
+    .lead { color: var(--muted); font-size: 18px; max-width: 640px; margin: 0; }
+
+    /* nav */
+    nav { position: sticky; top: 0; z-index: 10; background: rgba(15,17,21,.82); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.05); }
+    nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; border-radius: 8px; }
+    .navlinks { display: flex; gap: 22px; margin-left: auto; font-size: 15px; color: var(--muted); }
+    .navlinks a { text-decoration: none; } .navlinks a:hover { color: var(--text); }
+    .navcta { margin-left: 8px; }
+    @media (max-width: 760px) { .navlinks { display: none; } .navcta { margin-left: auto; } }
+
+    .btn { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 22px; border-radius: 999px; font-weight: 700; text-decoration: none; border: 1.5px solid transparent; transition: transform .12s, background .15s; }
+    .btn:active { transform: scale(.98); }
+    .btn.primary { background: var(--accent); color: var(--ink); box-shadow: 0 10px 30px rgba(255,138,61,.3); }
+    .btn.primary:hover { background: var(--accent-2); }
+    .btn.ghost { border-color: var(--line); background: var(--surface); }
+    .btn.ghost:hover { border-color: #3a4150; }
+    .btn.sm { height: 40px; padding: 0 16px; font-size: 14px; }
+    .btn small { display: block; font-weight: 500; font-size: 12px; opacity: .75; margin-top: -4px; }
+    .btn .two { display: flex; flex-direction: column; line-height: 1.25; text-align: left; }
+
+    /* hero */
+    .hero { padding: 64px 0 40px; background: radial-gradient(90% 60% at 70% 0%, rgba(255,138,61,.16), transparent 60%); overflow: hidden; }
+    .hero .wrap { display: grid; grid-template-columns: 1.15fr .85fr; gap: 48px; align-items: center; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgba(70,211,154,.12); color: var(--good); font-weight: 700; font-size: 13.5px; border: 1px solid rgba(70,211,154,.3); }
+    .hero h1 { font-size: clamp(38px, 6.4vw, 66px); line-height: 1.02; letter-spacing: -.035em; margin: 18px 0 18px; }
+    .hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 18px; }
+    .platforms { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 14px; }
+    .platforms span { display: inline-flex; align-items: center; gap: 6px; }
+    .platforms svg { width: 16px; height: 16px; color: var(--good); }
+    @media (max-width: 880px) { .hero .wrap { grid-template-columns: 1fr; } .phone { margin: 10px auto 0; } }
+
+    /* phone mockup (drawn in CSS, not a screenshot) */
+    .phone { width: min(300px, 78vw); aspect-ratio: 9/19; border-radius: 42px; padding: 12px; background: #050608; box-shadow: 0 0 0 2px #2b2f38, 0 40px 80px rgba(0,0,0,.6); position: relative; }
+    .screen { position: relative; width: 100%; height: 100%; border-radius: 32px; overflow: hidden; background: var(--bg); display: flex; flex-direction: column; }
+    .m-bar { display: flex; align-items: center; gap: 8px; padding: 18px 16px 10px; font-weight: 800; font-size: 14px; }
+    .m-bar img { width: 20px; height: 20px; border-radius: 5px; }
+    .m-tabs { display: flex; gap: 6px; padding: 0 16px 10px; }
+    .m-tabs i { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: var(--surface); color: var(--muted); }
+    .m-tabs i.on { background: var(--accent); color: var(--ink); }
+    .m-row { display: flex; gap: 10px; padding: 7px 16px; align-items: center; }
+    .m-th { width: 74px; aspect-ratio: 16/9; border-radius: 7px; flex: none; position: relative; overflow: hidden; }
+    .m-th b { position: absolute; right: 3px; bottom: 3px; font-size: 8px; background: rgba(0,0,0,.7); padding: 0 3px; border-radius: 3px; }
+    .m-th s { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--accent); }
+    .m-tx { flex: 1; min-width: 0; }
+    .m-tx p { margin: 0; height: 7px; border-radius: 4px; background: #343a46; }
+    .m-tx p + p { width: 55%; margin-top: 6px; background: #262b34; }
+    .m-player { margin: 12px 12px 0; border-radius: 16px; overflow: hidden; position: relative; aspect-ratio: 16/10; background: linear-gradient(135deg, #3b1d5e, #c2410c 55%, #fbbf24); }
+    .m-player::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 45%, rgba(0,0,0,.7)); }
+    .m-seek { position: absolute; left: 10px; right: 10px; bottom: 12px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.3); z-index: 1; }
+    .m-seek::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 38%; background: var(--accent); border-radius: 3px; }
+    .m-seek::after { content: ""; position: absolute; left: 38%; top: 50%; width: 9px; height: 9px; margin: -4.5px; border-radius: 50%; background: var(--accent); }
+    .m-play { position: absolute; left: 50%; top: 44%; width: 38px; height: 38px; margin: -19px; border-radius: 50%; background: rgba(255,255,255,.2); z-index: 1; display: grid; place-items: center; }
+    .m-play::before { content: ""; border-left: 11px solid #fff; border-top: 7px solid transparent; border-bottom: 7px solid transparent; margin-left: 3px; }
+    .m-noads { position: absolute; right: -14px; top: 64px; background: var(--good); color: #062b1c; font-weight: 900; font-size: 12px; padding: 8px 12px; border-radius: 12px; transform: rotate(6deg); box-shadow: 0 10px 24px rgba(0,0,0,.4); }
+
+    /* trio */
+    .trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 36px; }
+    @media (max-width: 860px) { .trio { grid-template-columns: 1fr; } }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+    .card .ic { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: rgba(255,138,61,.12); color: var(--accent); margin-bottom: 14px; }
+    .card h3 { margin: 0 0 6px; font-size: 19px; }
+    .card p { margin: 0; color: var(--muted); }
+    .card ul { margin: 12px 0 0; padding: 0; list-style: none; color: #cdd2db; font-size: 14.5px; }
+    .card li { display: flex; gap: 8px; padding: 3px 0; }
+    .card li svg { width: 18px; height: 18px; color: var(--good); margin-top: 3px; }
+    .card.big { border-color: rgba(255,138,61,.45); background: linear-gradient(160deg, rgba(255,138,61,.12), var(--surface) 60%); }
+
+    /* steps */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 32px; counter-reset: s; }
+    @media (max-width: 860px) { .steps { grid-template-columns: 1fr; } }
+    .step { position: relative; padding: 24px 24px 24px 76px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); }
+    .step::before { counter-increment: s; content: counter(s); position: absolute; left: 22px; top: 22px; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--accent); color: var(--ink); font-weight: 900; }
+    .step h3 { margin: 0 0 4px; font-size: 17px; }
+    .step p { margin: 0; color: var(--muted); font-size: 15px; }
+    .gestures { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+    .g { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); font-size: 14.5px; }
+    .g b { color: var(--accent); min-width: 0; }
+    .g svg { color: var(--muted); }
+
+    /* features */
+    .feat { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-top: 32px; }
+    .f { display: flex; gap: 14px; padding: 18px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+    .f svg { color: var(--accent); margin-top: 2px; }
+    .f b { display: block; margin-bottom: 2px; }
+    .f span { color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+    /* compare */
+    .tablewrap { margin-top: 30px; overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; background: var(--surface); }
+    th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 14.5px; }
+    thead th { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; background: #12151b; position: sticky; top: 0; }
+    thead th.us { color: var(--accent); }
+    td.us { background: rgba(255,138,61,.07); font-weight: 600; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td:first-child { color: #cdd2db; font-weight: 600; width: 26%; }
+    .y, .n, .p { display: inline-flex; align-items: center; gap: 6px; }
+    .y { color: var(--good); } .n { color: var(--bad); } .p { color: #f3c969; }
+    .y svg, .n svg, .p svg { width: 18px; height: 18px; }
+    td small { display: block; color: var(--muted); font-weight: 400; font-size: 12.5px; margin-top: 2px; }
+    .fineprint { color: var(--muted); font-size: 13px; margin-top: 12px; }
+    .unique { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 28px; }
+    @media (max-width: 760px) { .unique { grid-template-columns: 1fr; } }
+
+    /* cross-platform band */
+    .band { background: linear-gradient(135deg, #1b1410, #13161c 55%); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .band .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+    @media (max-width: 860px) { .band .wrap { grid-template-columns: 1fr; } }
+    .devices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .dev { padding: 18px 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); text-align: center; font-weight: 700; font-size: 14px; }
+    .dev svg { width: 30px; height: 30px; color: var(--accent); margin: 0 auto 8px; display: block; }
+    .dev small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; }
+    .how { margin-top: 18px; display: grid; gap: 8px; font-size: 14.5px; color: #cdd2db; }
+    .how div { padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,.04); }
+    .how b { color: var(--text); }
+
+    /* privacy */
+    .privacy { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 30px; }
+    @media (max-width: 760px) { .privacy { grid-template-columns: 1fr; } }
+    .card.never { border-color: rgba(70,211,154,.35); }
+    .card.never li svg { color: var(--good); }
+    .card.stays li svg { color: var(--accent); }
+
+    /* faq */
+    details { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 0 18px; margin-top: 10px; }
+    summary { cursor: pointer; padding: 16px 0; font-weight: 700; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; color: var(--accent); font-size: 22px; line-height: 1; }
+    details[open] summary::after { content: "–"; }
+    details p { margin: 0 0 16px; color: var(--muted); }
+
+    .final { text-align: center; }
+    .final .ctas { justify-content: center; }
+    footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 14px; }
+    footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+  </style>
 </head>
 <body>
-  <!-- ============ LIBRARY ============ -->
-  <section id="library" class="screen" aria-label="Library">
-    <header class="appbar">
-      <div class="brand">
-        <img src="icons/icon.svg" alt="" width="28" height="28">
-        <h1>Open Player</h1>
-      </div>
-      <div class="appbar-actions">
-        <button class="icon-btn" id="btnSearch" aria-label="Search"><svg><use href="#i-search"/></svg></button>
-        <button class="icon-btn" id="btnSort" aria-label="Sort"><svg><use href="#i-sort"/></svg></button>
-        <button class="icon-btn" id="btnSettings" aria-label="Settings"><svg><use href="#i-settings"/></svg></button>
-      </div>
-      <div class="searchbar" id="searchbar" hidden>
-        <button class="icon-btn" id="btnSearchClose" aria-label="Close search"><svg><use href="#i-back"/></svg></button>
-        <input id="searchInput" type="search" placeholder="Search videos and music" autocomplete="off">
-      </div>
-    </header>
-
-    <nav class="tabs" role="tablist">
-      <button role="tab" class="tab active" data-tab="folders">Folders</button>
-      <button role="tab" class="tab" data-tab="videos">Videos</button>
-      <button role="tab" class="tab" data-tab="music">Music</button>
-      <button role="tab" class="tab" data-tab="recent">Recent</button>
-    </nav>
-    <div class="chips subchips" id="musicChips" hidden>
-      <button data-mv="songs">Songs</button><button data-mv="albums">Albums</button><button data-mv="artists">Artists</button>
-    </div>
-
-    <div class="crumb" id="crumb" hidden>
-      <button class="icon-btn sm" id="btnCrumbBack" aria-label="Back to folders"><svg><use href="#i-back"/></svg></button>
-      <span id="crumbTitle"></span>
-    </div>
-
-    <main id="list" class="list"></main>
-
-    <div id="empty" class="empty" hidden>
-      <div class="empty-art"><svg><use href="#i-film"/></svg></div>
-      <h2>No videos yet</h2>
-      <p>Add videos, music or a whole folder from your phone. Nothing is uploaded — everything stays on your device.</p>
-      <div class="empty-actions">
-        <button class="btn primary" data-pick="files"><svg><use href="#i-plus"/></svg>Add videos</button>
-        <button class="btn" data-pick="folder"><svg><use href="#i-folder"/></svg>Add folder</button>
-      </div>
-    </div>
-
-    <button class="fab" id="fab" aria-label="Add videos"><svg><use href="#i-plus"/></svg></button>
-
-    <input type="file" id="pickFiles" accept="video/*,.mp4,.webm,.mkv,.mov,.m4v,.avi,.3gp,.ts,.ogv,.mpg,.mpeg,.flv,.wmv" multiple hidden>
-    <input type="file" id="pickFolder" webkitdirectory multiple hidden>
-    <input type="file" id="pickSub" accept=".srt,.vtt,text/vtt" hidden>
-    <input type="file" id="pickMusic" accept="audio/*,.mp3,.m4a,.aac,.flac,.wav,.ogg,.opus" multiple hidden>
-
-    <!-- mini player (music keeps playing while you browse) -->
-    <div class="mini" id="mini" hidden>
-      <div class="mini-prog"><i id="miniProg"></i></div>
-      <button class="mini-main" id="miniOpen">
-        <div class="art sm ph" id="miniArt"><svg><use href="#i-note"/></svg></div>
-        <div class="meta"><div class="name" id="miniTitle"></div><div class="sub" id="miniSub"></div></div>
-      </button>
-      <button class="icon-btn" id="miniPlay" aria-label="Play or pause"><svg><use href="#i-pause"/></svg></button>
-      <button class="icon-btn" id="miniNext" aria-label="Next"><svg><use href="#i-next"/></svg></button>
-      <button class="icon-btn sm" id="miniClose" aria-label="Stop"><svg><use href="#i-close"/></svg></button>
-    </div>
-  </section>
-
-  <!-- ============ FIRST RUN: how should Open Player find your media? ============ -->
-  <section id="onboard" class="screen onboard" hidden aria-label="Welcome">
-    <div class="ob-inner">
-      <img src="icons/icon.svg" alt="" width="84" height="84">
-      <h1>Welcome to Open Player</h1>
-      <p class="ob-lead">No ads. No tracking. Your videos and music never leave your phone.</p>
-      <div class="ob-cards">
-        <button class="ob-card rec" id="obFull">
-          <span class="ob-tag">Recommended</span>
-          <svg><use href="#i-folder"/></svg>
-          <b id="obFullTitle">Show all my videos &amp; music</b>
-          <small id="obFullText">Open Player asks for permission once, then lists everything on your phone automatically — like other players do.</small>
-        </button>
-        <button class="ob-card" id="obManual">
-          <svg><use href="#i-plus"/></svg>
-          <b>I’ll add files myself</b>
-          <small>No permission needed. Pick videos, songs or folders whenever you want.</small>
-        </button>
-      </div>
-      <p class="ob-foot" id="obFoot">You can change this anytime in Settings.</p>
-    </div>
-  </section>
-
-  <!-- ============ PLAYER ============ -->
-  <section id="player" class="screen player" hidden aria-label="Player">
-    <div class="stage" id="stage">
-      <video id="video" playsinline preload="metadata"></video>
-      <div class="audioview" id="audioview" hidden>
-        <div class="av-bg" id="avBg"></div>
-        <div class="av-art ph" id="avArt"><svg><use href="#i-note"/></svg></div>
-        <div class="av-title" id="avTitle"></div>
-        <div class="av-sub" id="avSub"></div>
-      </div>
-      <div class="dim" id="dim"></div>
-      <div class="subs" id="subs"></div>
-    </div>
-
-    <div class="gesture" id="gesture"></div>
-
-    <!-- center feedback -->
-    <div class="hud" id="hud" hidden>
-      <svg class="hud-icon"><use href="#i-sun"/></svg>
-      <div class="hud-bar"><i id="hudFill"></i></div>
-      <span class="hud-text" id="hudText"></span>
-    </div>
-    <div class="seekhud" id="seekhud" hidden></div>
-    <div class="ripple left" id="rippleL"><span>« 10s</span></div>
-    <div class="ripple right" id="rippleR"><span>10s »</span></div>
-    <div class="speedpill" id="speedpill" hidden>2× ▸▸</div>
-    <button class="recpill" id="recpill" hidden aria-label="Stop recording"><i></i>REC <span id="recTime">0:00</span><b>Stop</b></button>
-    <div class="toast" id="ptoast" hidden></div>
-    <div class="spinner" id="spinner" hidden></div>
-
-    <!-- controls -->
-    <div class="controls" id="controls">
-      <div class="top">
-        <button class="icon-btn" id="btnBack" aria-label="Back"><svg><use href="#i-back"/></svg></button>
-        <div class="title"><span id="vTitle"></span><small id="vSub"></small></div>
-        <button class="icon-btn" id="btnSubs" aria-label="Subtitles"><svg><use href="#i-cc"/></svg></button>
-        <button class="icon-btn" id="btnPip" aria-label="Picture in picture"><svg><use href="#i-pip"/></svg></button>
-        <button class="icon-btn" id="btnMore" aria-label="More options"><svg><use href="#i-more"/></svg></button>
-      </div>
-
-      <div class="side left">
-        <button class="chip-btn" id="btnSpeed" aria-label="Playback speed">1.0×</button>
-      </div>
-      <div class="side right">
-        <button class="icon-btn" id="btnRotate" aria-label="Rotate"><svg><use href="#i-rotate"/></svg></button>
-      </div>
-
-      <div class="bottom">
-        <div class="seekrow">
-          <span class="time" id="tCur">0:00</span>
-          <div class="seek" id="seek" role="slider" aria-label="Seek" tabindex="0">
-            <div class="seek-track"><i class="buf" id="seekBuf"></i><i class="played" id="seekPlayed"></i></div>
-            <div class="seek-marks" id="seekMarks"></div>
-            <div class="seek-thumb" id="seekThumb"></div>
-            <div class="seek-tip" id="seekTip" hidden>0:00</div>
-          </div>
-          <span class="time" id="tDur">0:00</span>
-        </div>
-        <div class="btnrow">
-          <button class="icon-btn" id="btnLock" aria-label="Lock screen"><svg><use href="#i-lock-open"/></svg></button>
-          <div class="transport">
-            <button class="icon-btn" id="btnPrev" aria-label="Previous"><svg><use href="#i-prev"/></svg></button>
-            <button class="icon-btn" id="btnRew" aria-label="Back 10 seconds"><svg><use href="#i-rew"/></svg></button>
-            <button class="play" id="btnPlay" aria-label="Play"><svg><use href="#i-play"/></svg></button>
-            <button class="icon-btn" id="btnFwd" aria-label="Forward 10 seconds"><svg><use href="#i-fwd"/></svg></button>
-            <button class="icon-btn" id="btnNext" aria-label="Next"><svg><use href="#i-next"/></svg></button>
-          </div>
-          <button class="icon-btn" id="btnAspect" aria-label="Aspect ratio"><svg><use href="#i-aspect"/></svg></button>
-        </div>
-      </div>
-    </div>
-
-    <button class="unlock" id="btnUnlock" hidden aria-label="Unlock"><svg><use href="#i-lock"/></svg></button>
-  </section>
-
-  <!-- ============ SHEETS ============ -->
-  <div class="scrim" id="scrim" hidden></div>
-  <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true">
-    <div class="sheet-grip"></div>
-    <h3 id="sheetTitle"></h3>
-    <div id="sheetBody"></div>
-  </div>
-
-  <div class="snackbar" id="snackbar" hidden><span id="snackText"></span><button id="snackAction"></button></div>
-
-  <!-- ============ ICONS ============ -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
-      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-      <symbol id="i-sort" viewBox="0 0 24 24"><path d="M4 7h16M7 12h10M10 17h4" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
-      <symbol id="i-settings" viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></symbol>
-      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
-      <symbol id="i-folder" viewBox="0 0 24 24"><path fill="currentColor" d="M3 6.5A2.5 2.5 0 0 1 5.5 4h3.6l2 2h7.4A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></symbol>
-      <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path fill="currentColor" d="M10 9.2v5.6l4.6-2.8z"/></symbol>
-      <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
-      <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
-      <symbol id="i-prev" viewBox="0 0 24 24"><path fill="currentColor" d="M7 5h2v14H7zM19 6v12a.8.8 0 0 1-1.2.7L10 12.7a.8.8 0 0 1 0-1.4l7.8-6A.8.8 0 0 1 19 6z"/></symbol>
-      <symbol id="i-next" viewBox="0 0 24 24"><path fill="currentColor" d="M15 5h2v14h-2zM5 6v12a.8.8 0 0 0 1.2.7l7.8-6a.8.8 0 0 0 0-1.4l-7.8-6A.8.8 0 0 0 5 6z"/></symbol>
-      <symbol id="i-rew" viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-6.6 4.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path fill="currentColor" d="M12 1.5v7L7.5 5z"/><text x="12" y="15.6" font-size="6.5" text-anchor="middle" fill="currentColor" font-family="system-ui" font-weight="700">10</text></symbol>
-      <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 0 6.6 4.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path fill="currentColor" d="M12 1.5v7L16.5 5z"/><text x="12" y="15.6" font-size="6.5" text-anchor="middle" fill="currentColor" font-family="system-ui" font-weight="700">10</text></symbol>
-      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
-      <symbol id="i-lock-open" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 10.5V8a4 4 0 0 1 7.7-1.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-      <symbol id="i-aspect" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 12V9.5h2.5M17 12v2.5h-2.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-      <symbol id="i-cc" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14h4M13 14h4M7 10.5h2M11 10.5h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-      <symbol id="i-pip" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="12" y="11.5" width="6.5" height="5" rx="1" fill="currentColor"/></symbol>
-      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5.5" r="1.9" fill="currentColor"/><circle cx="12" cy="12" r="1.9" fill="currentColor"/><circle cx="12" cy="18.5" r="1.9" fill="currentColor"/></symbol>
-      <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 12-4.9M19 12a7 7 0 0 1-12 4.9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path fill="currentColor" d="M18.5 3v5h-5zM5.5 21v-5h5z"/></symbol>
-      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-      <symbol id="i-vol" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9.5v5h3.5L12 19V5L7.5 9.5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-      <symbol id="i-mute" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9.5v5h3.5L12 19V5L7.5 9.5z"/><path d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12A7.5 7.5 0 1 1 17 6.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path fill="currentColor" d="M20 3v6h-6z"/></symbol>
-      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="7.8" r="1.3" fill="currentColor"/></symbol>
-      <symbol id="i-loop" viewBox="0 0 24 24"><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6H19M20 13v1.5a3.5 3.5 0 0 1-3.5 3.5H5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path fill="currentColor" d="M17 3l4 3-4 3zM7 15l-4 3 4 3z"/></symbol>
-      <symbol id="i-moon" viewBox="0 0 24 24"><path fill="currentColor" d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
-      <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.5" fill="#ff5d5d"/></symbol>
-      <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.7l1.3-2h5l1.3 2h1.7A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
-      <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
-      <symbol id="i-eq" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".45"/><rect x="3.5" y="12" width="5" height="3" rx="1.2" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" rx="1.2" fill="currentColor"/><rect x="15.5" y="14" width="5" height="3" rx="1.2" fill="currentColor"/></symbol>
-      <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V6l11-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.8" fill="currentColor"/><circle cx="17.5" cy="16" r="2.8" fill="currentColor"/></symbol>
-      <symbol id="i-note" viewBox="0 0 24 24"><path d="M10 17V5l8-1.5v3L12 7.6V17" fill="currentColor"/><circle cx="7.5" cy="17.2" r="3.2" fill="currentColor"/></symbol>
-      <symbol id="i-disc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/></symbol>
-      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="4" fill="currentColor"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0z" fill="currentColor"/></symbol>
-      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
-      <symbol id="i-android" viewBox="0 0 24 24"><path fill="currentColor" d="M6 9.5h12V18a1.5 1.5 0 0 1-1.5 1.5H16V22h-2v-2.5h-4V22H8v-2.5h-.5A1.5 1.5 0 0 1 6 18zM4 10a1 1 0 0 1 2 0v5a1 1 0 0 1-2 0zm14 0a1 1 0 0 1 2 0v5a1 1 0 0 1-2 0zM6.2 8.5A6 6 0 0 1 9 4.6L8 3l.8-.5 1 1.7a6 6 0 0 1 4.4 0l1-1.7.8.5-1 1.6a6 6 0 0 1 2.8 3.9zM9.5 6.8a.7.7 0 1 0 0-1.4.7.7 0 0 0 0 1.4zm5 0a.7.7 0 1 0 0-1.4.7.7 0 0 0 0 1.4z"/></symbol>
-      <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="ok" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="no" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+      <symbol id="half" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></symbol>
+      <symbol id="android" viewBox="0 0 24 24"><path fill="currentColor" d="M6 9.5h12V18a1.5 1.5 0 0 1-1.5 1.5H16V22h-2v-2.5h-4V22H8v-2.5h-.5A1.5 1.5 0 0 1 6 18zM4 10a1 1 0 0 1 2 0v5a1 1 0 0 1-2 0zm14 0a1 1 0 0 1 2 0v5a1 1 0 0 1-2 0zM6.2 8.5A6 6 0 0 1 9 4.6L8 3l.8-.5 1 1.7a6 6 0 0 1 4.4 0l1-1.7.8.5-1 1.6a6 6 0 0 1 2.8 3.9zM9.5 6.8a.7.7 0 1 0 0-1.4.7.7 0 0 0 0 1.4zm5 0a.7.7 0 1 0 0-1.4.7.7 0 0 0 0 1.4z"/></symbol>
+      <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+      <symbol id="noad" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M7.5 14.5l2-5 2 5M8.2 13h2.6M14 9.5v5h1.4a2.5 2.5 0 0 0 0-5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+      <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.6-3.3 8.1-8 9-4.7-.9-8-4.4-8-9V6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+      <symbol id="refresh" viewBox="0 0 24 24"><path d="M19.5 12A7.5 7.5 0 1 1 17 6.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path fill="currentColor" d="M20 3v6h-6z"/></symbol>
+      <symbol id="hand" viewBox="0 0 24 24"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V12m0-1a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L4.2 15a1.5 1.5 0 0 1 2.4-1.8L9 15.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="music" viewBox="0 0 24 24"><path d="M9 18V6l11-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.8" fill="currentColor"/><circle cx="17.5" cy="16" r="2.8" fill="currentColor"/></symbol>
+      <symbol id="cc" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 14h4M13 14h4M7 10.5h2M11 10.5h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="eq" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".45"/><rect x="3.5" y="12" width="5" height="3" rx="1.2" fill="currentColor"/><rect x="9.5" y="7" width="5" height="3" rx="1.2" fill="currentColor"/><rect x="15.5" y="14" width="5" height="3" rx="1.2" fill="currentColor"/></symbol>
+      <symbol id="rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.5" fill="currentColor"/></symbol>
+      <symbol id="folder" viewBox="0 0 24 24"><path fill="currentColor" d="M3 6.5A2.5 2.5 0 0 1 5.5 4h3.6l2 2h7.4A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></symbol>
+      <symbol id="eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></symbol>
+      <symbol id="share" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5" fill="currentColor"/><circle cx="18" cy="6" r="2.5" fill="currentColor"/><circle cx="18" cy="18" r="2.5" fill="currentColor"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" stroke="currentColor" stroke-width="2"/></symbol>
+      <symbol id="moon" viewBox="0 0 24 24"><path fill="currentColor" d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></symbol>
+      <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+      <symbol id="laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2 19h20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="tablet" viewBox="0 0 24 24"><rect x="4" y="2.5" width="16" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="dl" viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="play" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
     </defs>
   </svg>
 
-  <script src="app.js" type="module"></script>
+  <nav>
+    <div class="wrap">
+      <a class="brand" href="#top"><img src="app/icons/icon.svg" alt="">Open Player</a>
+      <div class="navlinks"><a href="#why">Why</a><a href="#use">How to use</a><a href="#features">Features</a><a href="#compare">Compare</a><a href="#privacy">Privacy</a></div>
+      <a class="btn primary sm navcta" href="#download">Get it free</a>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="wrap">
+      <div>
+        <span class="pill"><svg><use href="#noad"/></svg>0 ads · 0 trackers · 0 uploads</span>
+        <h1>The player that plays <em>your</em> videos. Not ads.</h1>
+        <p class="lead">Open Player is a free video and music player with gestures, subtitles, an equalizer and more — and absolutely no ads, no accounts and no tracking. Install it on Android, or just open it in any browser.</p>
+        <div class="ctas" id="download">
+          <a class="btn primary" href="https://github.com/adhil-bit/open-palyer/releases/latest" rel="noopener"><svg><use href="#android"/></svg><span class="two">Download for Android<small>Free APK · recommended</small></span></a>
+          <a class="btn ghost" href="app/"><svg><use href="#globe"/></svg><span class="two">Open in your browser<small>Works on any device</small></span></a>
+        </div>
+        <div class="platforms">
+          <span><svg><use href="#ok"/></svg>Android app</span>
+          <span><svg><use href="#ok"/></svg>Windows · Mac · Linux · ChromeOS</span>
+          <span><svg><use href="#ok"/></svg>iPhone &amp; iPad (web)</span>
+          <span><svg><use href="#ok"/></svg>Works offline</span>
+        </div>
+      </div>
+      <div class="phone" aria-hidden="true">
+        <div class="screen">
+          <div class="m-bar"><img src="app/icons/icon.svg" alt="">Open Player</div>
+          <div class="m-tabs"><i class="on">Folders</i><i>Videos</i><i>Music</i><i>Recent</i></div>
+          <div class="m-player"><div class="m-play"></div><div class="m-seek"></div></div>
+          <div style="height:12px"></div>
+          <div class="m-row"><div class="m-th" style="background:linear-gradient(135deg,#0f766e,#22d3ee)"><b>24:10</b><s style="width:60%"></s></div><div class="m-tx"><p></p><p></p></div></div>
+          <div class="m-row"><div class="m-th" style="background:linear-gradient(135deg,#7c2d12,#f97316)"><b>1:52:03</b></div><div class="m-tx"><p></p><p></p></div></div>
+          <div class="m-row"><div class="m-th" style="background:linear-gradient(135deg,#312e81,#a78bfa)"><b>08:44</b><s style="width:25%"></s></div><div class="m-tx"><p></p><p></p></div></div>
+          <div class="m-row"><div class="m-th" style="background:linear-gradient(135deg,#14532d,#4ade80)"><b>42:17</b></div><div class="m-tx"><p></p><p></p></div></div>
+        </div>
+        <div class="m-noads">NO ADS ✓</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- WHY -->
+  <section id="why">
+    <div class="wrap">
+      <div class="kicker">Why Open Player</div>
+      <h2>Built around three promises</h2>
+      <p class="lead">Most free players pay for themselves with ads and data. Open Player doesn’t need to.</p>
+      <div class="trio">
+        <div class="card big">
+          <div class="ic"><svg><use href="#noad"/></svg></div>
+          <h3>No ads. Ever.</h3>
+          <p>No banners, no pop-ups, no video ads before your video, no “upgrade to remove ads”.</p>
+          <ul><li><svg><use href="#ok"/></svg>No ad networks inside the app</li><li><svg><use href="#ok"/></svg>No paid “Pro” version needed</li><li><svg><use href="#ok"/></svg>Nothing between you and play</li></ul>
+        </div>
+        <div class="card">
+          <div class="ic"><svg><use href="#shield"/></svg></div>
+          <h3>Private by design</h3>
+          <p>Your videos and music are played straight from your device. Nothing is uploaded, ever.</p>
+          <ul><li><svg><use href="#ok"/></svg>No account or sign-in</li><li><svg><use href="#ok"/></svg>No analytics or tracking</li><li><svg><use href="#ok"/></svg>History stays on your device</li></ul>
+        </div>
+        <div class="card">
+          <div class="ic"><svg><use href="#bolt"/></svg></div>
+          <h3>Smart caching you control</h3>
+          <p>The app saves itself on your device so it opens instantly and works offline — and you decide when to clear it.</p>
+          <ul><li><svg><use href="#ok"/></svg>Works with no internet</li><li><svg><use href="#ok"/></svg>One-tap “Refresh app cache”</li><li><svg><use href="#ok"/></svg>Shows how much space it uses</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW TO USE -->
+  <section id="use" style="padding-top:24px">
+    <div class="wrap">
+      <div class="kicker">How to use</div>
+      <h2>Up and playing in a minute</h2>
+      <div class="steps">
+        <div class="step"><h3>Install or open</h3><p>Get the Android app from the download button, or open the web version and tap your browser’s <b>Install</b> / <b>Add to Home Screen</b>.</p></div>
+        <div class="step"><h3>Show your media</h3><p>In the Android app tap <b>Show all my videos &amp; music</b> and allow access once. Prefer not to? Choose <b>I’ll add files myself</b>.</p></div>
+        <div class="step"><h3>Play with gestures</h3><p>Tap a video. Control everything with swipes and taps — no tiny buttons needed.</p></div>
+      </div>
+      <div class="gestures">
+        <div class="g"><svg><use href="#hand"/></svg><span><b>Left side ↕</b> brightness</span></div>
+        <div class="g"><svg><use href="#hand"/></svg><span><b>Right side ↕</b> volume, up to 200%</span></div>
+        <div class="g"><svg><use href="#hand"/></svg><span><b>Swipe ↔</b> seek with preview</span></div>
+        <div class="g"><svg><use href="#hand"/></svg><span><b>Double-tap sides</b> skip 10 s</span></div>
+        <div class="g"><svg><use href="#hand"/></svg><span><b>Hold</b> 2× speed while held</span></div>
+        <div class="g"><svg><use href="#hand"/></svg><span><b>Pinch</b> zoom in / out</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CROSS PLATFORM -->
+  <section class="band" id="everywhere">
+    <div class="wrap">
+      <div>
+        <div class="kicker">One player, every device</div>
+        <h2>Install it from a link. No app store needed.</h2>
+        <p class="lead">Open Player is also a <b>Progressive Web App</b>: the same player runs in Chrome, Edge, Safari or Firefox on phones, tablets and computers — and installs to your home screen or dock like a normal app. Updates arrive on their own.</p>
+        <div class="how">
+          <div><b>Android:</b> Download the app (recommended), or Chrome menu → Install app</div>
+          <div><b>Windows / Linux / ChromeOS:</b> Chrome or Edge → install icon in the address bar</div>
+          <div><b>Mac:</b> Safari → File → Add to Dock, or Chrome → Install</div>
+          <div><b>iPhone / iPad:</b> Safari → Share → Add to Home Screen</div>
+        </div>
+      </div>
+      <div class="devices">
+        <div class="dev"><svg><use href="#phone"/></svg>Android<small>App + web</small></div>
+        <div class="dev"><svg><use href="#phone"/></svg>iPhone<small>Web app</small></div>
+        <div class="dev"><svg><use href="#tablet"/></svg>Tablets<small>Web app</small></div>
+        <div class="dev"><svg><use href="#laptop"/></svg>Windows<small>Web app</small></div>
+        <div class="dev"><svg><use href="#laptop"/></svg>Mac<small>Web app</small></div>
+        <div class="dev"><svg><use href="#laptop"/></svg>Linux<small>Web app</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="wrap">
+      <div class="kicker">Features</div>
+      <h2>Everything you expect from a serious player</h2>
+      <div class="feat">
+        <div class="f"><svg><use href="#folder"/></svg><div><b>Your whole library</b><span>Folders, videos, thumbnails, resume points and “new” badges. The Android app finds everything automatically.</span></div></div>
+        <div class="f"><svg><use href="#music"/></svg><div><b>Music too</b><span>Songs, albums and artists with album art, and a mini player that keeps playing while you browse.</span></div></div>
+        <div class="f"><svg><use href="#cc"/></svg><div><b>Subtitles that fit</b><span>Loads .srt / .vtt automatically, with size, position, background and ±50 ms sync.</span></div></div>
+        <div class="f"><svg><use href="#eq"/></svg><div><b>Equalizer &amp; boost</b><span>10 bands, 12 presets, volume boost to 200% and audio delay for out-of-sync files.</span></div></div>
+        <div class="f"><svg><use href="#rec"/></svg><div><b>Record &amp; screenshot</b><span>Save a clip of what’s playing, or grab a full-quality still frame.</span></div></div>
+        <div class="f"><svg><use href="#refresh"/></svg><div><b>A-B repeat &amp; bookmarks</b><span>Loop a section, jump to a time, and mark favourite moments on the seek bar.</span></div></div>
+        <div class="f"><svg><use href="#eye"/></svg><div><b>Find hidden videos</b><span>Optionally searches folders other apps hide from players (.nomedia), on Android.</span></div></div>
+        <div class="f"><svg><use href="#share"/></svg><div><b>Open from any app</b><span>“Open with” or Share → Open Player from file managers, Telegram and more.</span></div></div>
+        <div class="f"><svg><use href="#lock"/></svg><div><b>Lock, PiP &amp; rotate</b><span>Screen lock for kids and pockets, picture-in-picture, and auto rotation.</span></div></div>
+        <div class="f"><svg><use href="#moon"/></svg><div><b>Sleep timer &amp; speed</b><span>Stop after a set time, and play from 0.25× to 4× with a default you choose.</span></div></div>
+        <div class="f"><svg><use href="#play"/></svg><div><b>Picture tuning</b><span>Aspect ratios, zoom, contrast, saturation, hue and mirror.</span></div></div>
+        <div class="f"><svg><use href="#globe"/></svg><div><b>Network streams</b><span>Paste a direct video link and play it.</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARE -->
+  <section id="compare" style="padding-top:24px">
+    <div class="wrap">
+      <div class="kicker">How it compares</div>
+      <h2>Open Player vs. popular players</h2>
+      <p class="lead">Every one of these is a good player. Here’s an honest look at where Open Player is different.</p>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr><th></th><th class="us">Open Player</th><th>VLC</th><th>MX Player (free)</th><th>Just Player</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Ads in the free app</td>
+              <td class="us"><span class="y"><svg><use href="#ok"/></svg>None</span></td>
+              <td><span class="y"><svg><use href="#ok"/></svg>None</span></td>
+              <td><span class="n"><svg><use href="#no"/></svg>Yes</span><small>Banners, pop-ups and video ads; paid upgrade removes most</small></td>
+              <td><span class="y"><svg><use href="#ok"/></svg>None</span></td>
+            </tr>
+            <tr>
+              <td>Runs in a browser, nothing to install</td>
+              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Installable web app (PWA)</small></td>
+              <td><span class="n"><svg><use href="#no"/></svg>No</span></td>
+              <td><span class="n"><svg><use href="#no"/></svg>No</span></td>
+              <td><span class="n"><svg><use href="#no"/></svg>No</span></td>
+            </tr>
+            <tr>
+              <td>Same player on phone and computer</td>
+              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Android app + any browser, same design</small></td>
+              <td><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Separate apps per system</small></td>
+              <td><span class="p"><svg><use href="#half"/></svg>Mostly mobile</span></td>
+              <td><span class="p"><svg><use href="#half"/></svg>Android only</span></td>
+            </tr>
+            <tr>
+              <td>Your cache, your control</td>
+              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Offline mode, storage meter, one-tap refresh</small></td>
+              <td colspan="3" style="color:var(--muted)">Standard app caching handled by Android</td>
+            </tr>
+            <tr>
+              <td>Help with Telegram downloads</td>
+              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Built-in guide</span><small>Plus “Open with” and hidden-folder search</small></td>
+              <td><span class="p"><svg><use href="#half"/></svg>Open with</span></td>
+              <td><span class="p"><svg><use href="#half"/></svg>Open with</span></td>
+              <td><span class="p"><svg><use href="#half"/></svg>Open with</span></td>
+            </tr>
+            <tr>
+              <td>Gestures, subtitles, speed, PiP</td>
+              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span></td>
+              <td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td>
+              <td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td>
+              <td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td>
+            </tr>
+            <tr>
+              <td>Format support</td>
+              <td class="us"><span class="p"><svg><use href="#half"/></svg>Common formats</span><small>MP4, WebM, most MKV, MP3, AAC, FLAC…</small></td>
+              <td><span class="y"><svg><use href="#ok"/></svg>Widest</span><small>Plays almost anything</small></td>
+              <td><span class="y"><svg><use href="#ok"/></svg>Very wide</span></td>
+              <td><span class="y"><svg><use href="#ok"/></svg>Wide</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fineprint">Based on each app’s free Android version and public information, November 2026. Features change over time; tell us if something here is out of date.</p>
+
+      <div class="unique">
+        <div class="card big">
+          <h3>What’s unique about Open Player</h3>
+          <ul>
+            <li><svg><use href="#ok"/></svg><span><b>One link, every device.</b> Open it in any browser and it works — then install it like an app. No other player here does that.</span></li>
+            <li><svg><use href="#ok"/></svg><span><b>No ads and no upsell.</b> There is no “Pro” tier; every feature is free.</span></li>
+            <li><svg><use href="#ok"/></svg><span><b>You control the cache.</b> See the space used and refresh it with one tap.</span></li>
+            <li><svg><use href="#ok"/></svg><span><b>Made for how people actually get videos</b> — Telegram, hidden folders, “Open with”.</span></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>When another player is better</h3>
+          <p>If you play unusual formats — AVI, FLV, WMV, or films with AC3/DTS surround audio — <b>VLC</b> handles more of them today. Open Player focuses on the formats phones and browsers play smoothly, with a cleaner, private experience.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIVACY -->
+  <section id="privacy" style="padding-top:24px">
+    <div class="wrap">
+      <div class="kicker">Privacy &amp; caching</div>
+      <h2>What happens to your data? Almost nothing.</h2>
+      <p class="lead">Open Player runs entirely on your device. Here’s exactly what it keeps and what it never does.</p>
+      <div class="privacy">
+        <div class="card never">
+          <h3>Never</h3>
+          <ul>
+            <li><svg><use href="#ok"/></svg>Uploads your videos, music or file names</li>
+            <li><svg><use href="#ok"/></svg>Shows ads or loads ad networks</li>
+            <li><svg><use href="#ok"/></svg>Uses analytics, trackers or fingerprinting</li>
+            <li><svg><use href="#ok"/></svg>Asks you to sign in or make an account</li>
+            <li><svg><use href="#ok"/></svg>Sells or shares anything — there’s nothing to share</li>
+          </ul>
+        </div>
+        <div class="card stays">
+          <h3>Stays on your device</h3>
+          <ul>
+            <li><svg><use href="#ok"/></svg><span><b>App files</b> — cached so it opens instantly and works offline</span></li>
+            <li><svg><use href="#ok"/></svg><span><b>Thumbnails</b> — so your library loads fast</span></li>
+            <li><svg><use href="#ok"/></svg><span><b>Resume points, bookmarks, settings</b> — so you continue where you left off</span></li>
+            <li><svg><use href="#ok"/></svg><span>Clear any of it in <b>Settings › Storage &amp; cache</b>: Refresh app cache, Clear thumbnails, Clear watch history</span></li>
+          </ul>
+        </div>
+      </div>
+      <p class="fineprint">The internet is only used to load or update the app itself, and to play network links you choose to open. Android permissions are optional: without them you can still add files yourself.</p>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" style="padding-top:24px">
+    <div class="wrap" style="max-width:820px">
+      <div class="kicker">Questions</div>
+      <h2>Good to know</h2>
+      <details><summary>Is it really free? What’s the catch?</summary><p>Yes, completely free, with no ads and no paid tier. There’s no catch: it doesn’t collect data, so there’s nothing to sell.</p></details>
+      <details><summary>Android app or web version — which should I use?</summary><p>On Android, use the app: it can show all your videos and music automatically, open files from other apps, and find hidden folders. On computers, iPhones and iPads, use the web version — it has the same player; you add files yourself.</p></details>
+      <details><summary>Why can’t I see my Telegram downloads?</summary><p>Newer Telegram versions (and Plus Messenger) keep downloads in a private folder that Android doesn’t let any other app open — including VLC and MX Player. Use Share / Open with → Open Player in Telegram to play them instantly, or “Save to Downloads” so they appear in your library. The app has a step-by-step guide in Settings.</p></details>
+      <details><summary>Android says “install unknown apps” — is that safe?</summary><p>Android shows this for any app that isn’t from the Play Store. Allow it once for your browser or file manager to install Open Player; you can turn it off again afterwards.</p></details>
+      <details><summary>Which formats does it play?</summary><p>MP4 (H.264/H.265 where your phone supports it), WebM, most MKV files, MOV, and music like MP3, AAC, M4A, FLAC, WAV, OGG and Opus. Some older formats and surround-sound tracks (AVI, FLV, WMV, AC3, DTS) may not play yet.</p></details>
+      <details><summary>Something looks out of date after an update.</summary><p>Open Settings › Storage &amp; cache › <b>Refresh app cache</b>. It clears the stored app files and reloads the newest version. Your library, history and settings are kept.</p></details>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <h2>Watch without the ads.</h2>
+      <p class="lead" style="margin:0 auto">Free on Android and in every browser.</p>
+      <div class="ctas">
+        <a class="btn primary" href="https://github.com/adhil-bit/open-palyer/releases/latest" rel="noopener"><svg><use href="#dl"/></svg><span class="two">Download for Android<small>Free APK</small></span></a>
+        <a class="btn ghost" href="app/"><svg><use href="#globe"/></svg><span class="two">Open in browser<small>No install needed</small></span></a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Open Player · No ads. No tracking. Nothing uploaded.</span>
+      <span>VLC, MX Player and Just Player are trademarks of their respective owners. Open Player isn’t affiliated with them.</span>
+    </div>
+  </footer>
+
+  <script>
+    // Retire the service worker from before the player moved to /app/ (kept small and safe).
+    if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => {
+      if (new URL(r.scope).pathname === location.pathname.replace(/[^/]*$/, '')) r.unregister();
+    })).catch(() => {});
+  </script>
 </body>
 </html>

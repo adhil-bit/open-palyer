@@ -76,11 +76,13 @@ Newer Telegram versions keep downloads in their own private storage (`Android/da
 
 1. Repo → **Settings → Pages**
 2. Source: **Deploy from a branch**, Branch: `main`, folder `/ (root)` → Save
-3. After a minute it's live at `https://adhil-bit.github.io/open-palyer/`
+3. After a minute it's live:
+   - Landing page: `https://adhil-bit.github.io/open-palyer/`
+   - The player (web app): `https://adhil-bit.github.io/open-palyer/app/`
 
 ## Releasing an update
 
-Bump the version in **both** `sw.js` (`VERSION`) and `app.js` (`APP_VERSION`), then push. The APK build runs on the same push.
+Bump the version in **both** `app/sw.js` (`VERSION`) and `app/app.js` (`APP_VERSION`), then push. The APK build runs on the same push.
 Installed apps will show "A new version is ready — Reload". Users can also force it with
 **Settings → Refresh app cache**.
 
@@ -94,11 +96,13 @@ Installed apps will show "A new version is ready — Reload". Users can also for
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | App layout and icons |
-| `styles.css` | All styling |
-| `app.js` | Library, player, gestures, subtitles, settings |
-| `sw.js` | Offline cache, updates, share target |
-| `manifest.webmanifest` | Install info, share target, file handling |
+| `index.html` | Landing page (download, features, comparison, privacy) |
+| `app/index.html` | Player layout and icons |
+| `app/styles.css` | Player styling |
+| `app/app.js` | Library, player, gestures, subtitles, settings |
+| `app/sw.js` | Offline cache, updates, share target |
+| `app/manifest.webmanifest` | Install info, share target, file handling |
+| `sw.js` (root) | Retires the old service worker from before the player moved to `app/` |
 | `android/` | Android app (Capacitor); native media code in `MediaLibraryPlugin.java` |
 | `scripts/build-www.mjs` | Copies the web app into the Android build |
 | `.github/workflows/android.yml` | Builds the APK and publishes it to Releases |
