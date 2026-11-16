@@ -3,6 +3,32 @@
 An ad-free video and music player for your phone — as an **Android app** (recommended) or a web app.
 **No ads. No tracking. Nothing uploaded** — your videos are played straight from your device.
 
+## How Open Player compares
+
+All of these are good players, and VLC and Next Player are ad-free too. What Open Player does that none of them do:
+
+- **One player on every device.** The same player runs in any browser on iPhone, PC and Mac and installs like an app; on Android there's the full app.
+- **Proves it's genuine.** Every download comes with its SHA-256 checksum, signing-certificate fingerprint and VirusTotal result, and the app's **Verify app** screen shows its own fingerprint to compare.
+- **Made for Telegram downloads.** A built-in guide for videos other players can't find, "Open with" from Telegram, and an optional hidden-folder search.
+- **MX-style comfort, zero tracking.** A private PIN folder, play queue, playlists and familiar gestures, without ads, ad networks or analytics.
+
+| | **Open Player** | MX Player (free) | VLC | Next Player |
+|---|---|---|---|---|
+| Ads | ✅ None | ❌ Yes: banners, pop-ups, video ads (paid Pro removes most) | ✅ None | ✅ None |
+| Ad networks & trackers inside | ✅ None | ❌ 9 ad networks, plus analytics (AppsFlyer, CleverTap, Firebase) | ✅ None | ✅ None |
+| Runs in a browser on any device | ✅ Android app + web app for iPhone, PC, Mac | ❌ No | ◐ Separate app per system | ❌ Android only |
+| Prove your copy is genuine | ✅ Checksum, fingerprint and virus scan on the site; in-app **Verify app** | ◐ Play Store only | ◐ App stores (Play, F-Droid) | ◐ F-Droid |
+| Private folder with PIN | ✅ Yes | ✅ Yes | ❌ No | ❌ No |
+| Help with Telegram downloads | ✅ Guide, Open with, hidden-folder search | ◐ Open with | ◐ Open with | ◐ Open with |
+| Gestures, PiP, speed, screen lock | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+| Cache you can see & clear | ✅ Storage meter, one-tap refresh | ◐ Android settings | ◐ Android settings | ◐ Android settings |
+| Format support | ◐ Common formats: MP4, WebM, most MKV, MP3, AAC, FLAC | ✅ Very wide | ✅ Widest | ✅ Wide (incl. AC3, DTS, TrueHD audio) |
+| Embedded subtitles & audio-language choice | ❌ Not yet (external .srt / .vtt only) | ✅ Yes | ✅ Yes | ✅ Yes |
+
+**When another player is better:** for unusual formats (AVI, WMV, FLV), films with AC3/DTS surround sound, or switching between subtitle tracks and audio languages inside an MKV, VLC or Next Player handle more today. VLC also plays from home network shares and casts to TVs.
+
+<sub>Android versions, from public information as of November 2026: MX Player's ad networks and trackers as listed by [AppGoblin](https://www.appgoblin.info/apps/com.mxtech.videoplayer.ad); Next Player's features from its [F-Droid page](https://f-droid.org/packages/dev.anilbeesetti.nextplayer/). VLC, MX Player and Next Player are trademarks of their respective owners; Open Player isn't affiliated with them.</sub>
+
 ## Features
 
 **Library**

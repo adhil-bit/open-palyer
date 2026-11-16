@@ -134,6 +134,8 @@
     .y svg, .n svg, .p svg { width: 18px; height: 18px; }
     td small { display: block; color: var(--muted); font-weight: 400; font-size: 12.5px; margin-top: 2px; }
     .fineprint { color: var(--muted); font-size: 13px; margin-top: 12px; }
+    .quad { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 32px 0 8px; }
+    @media (max-width: 760px) { .quad { grid-template-columns: 1fr; } }
     .unique { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 28px; }
     @media (max-width: 760px) { .unique { grid-template-columns: 1fr; } }
 
@@ -374,80 +376,67 @@
   <!-- COMPARE -->
   <section id="compare" style="padding-top:24px">
     <div class="wrap">
-      <div class="kicker">How it compares</div>
-      <h2>Open Player vs. popular players</h2>
-      <p class="lead">Every one of these is a good player. Here’s an honest look at where Open Player is different.</p>
+      <div class="kicker">How it’s different</div>
+      <h2>Open Player vs. MX Player, VLC and Next Player</h2>
+      <p class="lead">All of these are good players, and VLC and Next Player are ad-free too. Here’s what Open Player does that none of them do, and an honest side-by-side.</p>
+
+      <div class="quad">
+        <div class="card big">
+          <div class="ic"><svg><use href="#globe"/></svg></div>
+          <h3>One player on every device</h3>
+          <p>The only one here you can open from a link: the same player runs in any browser on iPhone, PC and Mac, and installs like an app. On Android, get the full app.</p>
+        </div>
+        <div class="card big">
+          <div class="ic"><svg><use href="#shield"/></svg></div>
+          <h3>Proves it’s genuine</h3>
+          <p>Every download comes with its checksum, signing fingerprint and virus-scan result, and the app can show its own fingerprint so you can compare. Nothing to take on trust.</p>
+        </div>
+        <div class="card big">
+          <div class="ic"><svg><use href="#share"/></svg></div>
+          <h3>Made for Telegram downloads</h3>
+          <p>A built-in guide for videos that other players can’t find, “Open with” from Telegram, and an optional search of hidden folders.</p>
+        </div>
+        <div class="card big">
+          <div class="ic"><svg><use href="#lock"/></svg></div>
+          <h3>MX-style comfort, zero tracking</h3>
+          <p>A private PIN folder, play queue, playlists and familiar gestures, like MX Player, but without its ads, ad networks or analytics.</p>
+        </div>
+      </div>
+
       <div class="tablewrap">
         <table>
           <thead>
-            <tr><th></th><th class="us">Open Player</th><th>VLC</th><th>MX Player (free)</th><th>Just Player</th></tr>
+            <tr><th></th><th class="us">Open Player</th><th>MX Player (free)</th><th>VLC</th><th>Next Player</th></tr>
           </thead>
           <tbody>
-            <tr>
-              <td>Ads in the free app</td>
-              <td class="us"><span class="y"><svg><use href="#ok"/></svg>None</span></td>
-              <td><span class="y"><svg><use href="#ok"/></svg>None</span></td>
-              <td><span class="n"><svg><use href="#no"/></svg>Yes</span><small>Banners, pop-ups and video ads; paid upgrade removes most</small></td>
-              <td><span class="y"><svg><use href="#ok"/></svg>None</span></td>
-            </tr>
-            <tr>
-              <td>Runs in a browser, nothing to install</td>
-              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Installable web app (PWA)</small></td>
-              <td><span class="n"><svg><use href="#no"/></svg>No</span></td>
-              <td><span class="n"><svg><use href="#no"/></svg>No</span></td>
-              <td><span class="n"><svg><use href="#no"/></svg>No</span></td>
-            </tr>
-            <tr>
-              <td>Same player on phone and computer</td>
-              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Android app + any browser, same design</small></td>
-              <td><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Separate apps per system</small></td>
-              <td><span class="p"><svg><use href="#half"/></svg>Mostly mobile</span></td>
-              <td><span class="p"><svg><use href="#half"/></svg>Android only</span></td>
-            </tr>
-            <tr>
-              <td>Your cache, your control</td>
-              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Offline mode, storage meter, one-tap refresh</small></td>
-              <td colspan="3" style="color:var(--muted)">Standard app caching handled by Android</td>
-            </tr>
-            <tr>
-              <td>Help with Telegram downloads</td>
-              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Built-in guide</span><small>Plus “Open with” and hidden-folder search</small></td>
-              <td><span class="p"><svg><use href="#half"/></svg>Open with</span></td>
-              <td><span class="p"><svg><use href="#half"/></svg>Open with</span></td>
-              <td><span class="p"><svg><use href="#half"/></svg>Open with</span></td>
-            </tr>
-            <tr>
-              <td>Gestures, subtitles, speed, PiP</td>
-              <td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span></td>
-              <td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td>
-              <td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td>
-              <td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td>
-            </tr>
-            <tr>
-              <td>Format support</td>
-              <td class="us"><span class="p"><svg><use href="#half"/></svg>Common formats</span><small>MP4, WebM, most MKV, MP3, AAC, FLAC…</small></td>
-              <td><span class="y"><svg><use href="#ok"/></svg>Widest</span><small>Plays almost anything</small></td>
-              <td><span class="y"><svg><use href="#ok"/></svg>Very wide</span></td>
-              <td><span class="y"><svg><use href="#ok"/></svg>Wide</span></td>
-            </tr>
+            <tr><td>Ads</td><td class="us"><span class="y"><svg><use href="#ok"/></svg>None</span></td><td><span class="n"><svg><use href="#no"/></svg>Yes</span><small>Banners, pop-ups and video ads; paid Pro removes most</small></td><td><span class="y"><svg><use href="#ok"/></svg>None</span></td><td><span class="y"><svg><use href="#ok"/></svg>None</span></td></tr>
+            <tr><td>Ad networks &amp; trackers inside</td><td class="us"><span class="y"><svg><use href="#ok"/></svg>None</span></td><td><span class="n"><svg><use href="#no"/></svg>9 ad networks</span><small>Plus analytics such as AppsFlyer, CleverTap, Firebase</small></td><td><span class="y"><svg><use href="#ok"/></svg>None</span></td><td><span class="y"><svg><use href="#ok"/></svg>None</span></td></tr>
+            <tr><td>Runs in a browser on any device</td><td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Android app + installable web app for iPhone, PC, Mac</small></td><td><span class="n"><svg><use href="#no"/></svg>No</span></td><td><span class="p"><svg><use href="#half"/></svg>Separate apps</span><small>One per system</small></td><td><span class="n"><svg><use href="#no"/></svg>Android only</span></td></tr>
+            <tr><td>Prove your copy is genuine</td><td class="us"><span class="y"><svg><use href="#ok"/></svg>Built in</span><small>Checksum, signing fingerprint and virus scan on the site; “Verify app” screen</small></td><td><span class="p"><svg><use href="#half"/></svg>Play Store only</span></td><td><span class="p"><svg><use href="#half"/></svg>App stores</span><small>Play Store, F-Droid</small></td><td><span class="p"><svg><use href="#half"/></svg>F-Droid</span></td></tr>
+            <tr><td>Private folder with PIN</td><td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="n"><svg><use href="#no"/></svg>No</span></td><td><span class="n"><svg><use href="#no"/></svg>No</span></td></tr>
+            <tr><td>Help with Telegram downloads</td><td class="us"><span class="y"><svg><use href="#ok"/></svg>Built in</span><small>Step-by-step guide, “Open with”, hidden-folder search</small></td><td><span class="p"><svg><use href="#half"/></svg>Open with</span></td><td><span class="p"><svg><use href="#half"/></svg>Open with</span></td><td><span class="p"><svg><use href="#half"/></svg>Open with</span></td></tr>
+            <tr><td>Gestures, PiP, speed, screen lock</td><td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td></tr>
+            <tr><td>Cache you can see &amp; clear</td><td class="us"><span class="y"><svg><use href="#ok"/></svg>Yes</span><small>Storage meter, one-tap refresh</small></td><td><span class="p"><svg><use href="#half"/></svg>Android settings</span></td><td><span class="p"><svg><use href="#half"/></svg>Android settings</span></td><td><span class="p"><svg><use href="#half"/></svg>Android settings</span></td></tr>
+            <tr><td>Format support</td><td class="us"><span class="p"><svg><use href="#half"/></svg>Common formats</span><small>MP4, WebM, most MKV, MP3, AAC, FLAC</small></td><td><span class="y"><svg><use href="#ok"/></svg>Very wide</span></td><td><span class="y"><svg><use href="#ok"/></svg>Widest</span></td><td><span class="y"><svg><use href="#ok"/></svg>Wide</span><small>Incl. AC3, DTS, TrueHD audio</small></td></tr>
+            <tr><td>Embedded subtitles &amp; audio-language choice</td><td class="us"><span class="n"><svg><use href="#no"/></svg>Not yet</span><small>External .srt / .vtt only</small></td><td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="y"><svg><use href="#ok"/></svg>Yes</span></td></tr>
           </tbody>
         </table>
       </div>
-      <p class="fineprint">Based on each app’s free Android version and public information, November 2026. Features change over time; tell us if something here is out of date.</p>
+      <p class="fineprint">Android versions, from public information as of November 2026: MX Player’s ad networks and trackers as listed by AppGoblin; Next Player’s features from its F-Droid page. Features change over time; tell us if something here is out of date.</p>
 
       <div class="unique">
-        <div class="card big">
-          <h3>What’s unique about Open Player</h3>
+        <div class="card">
+          <h3>Pick Open Player if you want…</h3>
           <ul>
-            <li><svg><use href="#ok"/></svg><span><b>One link, every device.</b> Open it in any browser and it works — then install it like an app. No other player here does that.</span></li>
-            <li><svg><use href="#ok"/></svg><span><b>No ads and no upsell.</b> There is no “Pro” tier; every feature is free.</span></li>
-            <li><svg><use href="#ok"/></svg><span><b>You control the cache.</b> See the space used and refresh it with one tap.</span></li>
-            <li><svg><use href="#ok"/></svg><span><b>Made for how people actually get videos</b> — Telegram, hidden folders, “Open with”.</span></li>
+            <li><svg><use href="#ok"/></svg><span>No ads and nothing tracking you, with the comfort features MX Player users expect.</span></li>
+            <li><svg><use href="#ok"/></svg><span>The same player on your phone, iPhone and computer.</span></li>
+            <li><svg><use href="#ok"/></svg><span>To watch Telegram videos without hunting for them.</span></li>
+            <li><svg><use href="#ok"/></svg><span>To check for yourself that the app is genuine.</span></li>
           </ul>
         </div>
         <div class="card">
           <h3>When another player is better</h3>
-          <p>If you play unusual formats — AVI, FLV, WMV, or films with AC3/DTS surround audio — <b>VLC</b> handles more of them today. Open Player focuses on the formats phones and browsers play smoothly, with a cleaner, private experience.</p>
+          <p>For unusual formats (AVI, WMV, FLV), films with AC3/DTS surround sound, or switching between subtitle tracks and audio languages inside an MKV, <b>VLC</b> or <b>Next Player</b> handle more today. VLC also plays from home network shares and casts to TVs. Open Player focuses on the formats phones play smoothly, with a cleaner, private experience.</p>
         </div>
       </div>
     </div>
@@ -546,7 +535,7 @@
   <footer>
     <div class="wrap">
       <span>© 2026 Open Player · No ads. No tracking. Nothing uploaded.</span>
-      <span>VLC, MX Player and Just Player are trademarks of their respective owners. Open Player isn’t affiliated with them.</span>
+      <span>VLC, MX Player and Next Player are trademarks of their respective owners. Open Player isn’t affiliated with them.</span>
     </div>
   </footer>
 
