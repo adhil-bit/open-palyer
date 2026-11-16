@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.6.2';
+const APP_VERSION = '1.7.0';
 // The website's download section: the APK link there comes with its checksum and signing fingerprint.
 const ANDROID_APK_URL = new URL('../#download', location.href).href;
 const VERIFY_URL = new URL('../#verify', location.href).href;
@@ -18,6 +18,7 @@ const SUB_EXT = /\.(srt|vtt)$/i;
 const Cap = window.Capacitor;
 const NATIVE = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
 const ML = NATIVE ? (Cap.registerPlugin ? Cap.registerPlugin('MediaLibrary') : Cap.Plugins?.MediaLibrary) : null;
+const DESK = window.OPDesktop || null;   // desktop app (Electron) with its own FFmpeg
 const NP = NATIVE && Cap.registerPlugin ? Cap.registerPlugin('NativePlayer') : null;   // all-formats engine
 const IS_ANDROID_BROWSER = !NATIVE && /Android/i.test(navigator.userAgent);
 const nativeSrc = (path, uri) => Cap.convertFileSrc(path ? 'file://' + path : uri);
@@ -128,10 +129,12 @@ function addFiles(fileList, fromFolder = false) {
       || subs.get(dir + '/' + baseName(baseName(f.name)).toLowerCase()) || null);
     const it = { id, kind: isAudio ? 'audio' : 'video', file: f, name: f.name, size: f.size, mtime: f.lastModified || 0, folder, url: null, dur: 0, thumb: null, sub };
     if (isAudio) { it.title = baseName(f.name); it.artist = ''; it.album = folder; songs++; }
+    if (DESK) { const pth = DESK.pathFor(f); if (pth) { it.dpath = pth; it.subPath = sub ? DESK.pathFor(sub) : null; } }
     lib.items.push(it); lib.byId.set(id, it); added++;
   }
   if (added) {
     adoptMovedHistory(lib.items.slice(-added));
+    if (DESK) deskSave();
     const vids = added - songs;
     snack([vids && `${vids} video${vids > 1 ? 's' : ''}`, songs && `${songs} song${songs > 1 ? 's' : ''}`].filter(Boolean).join(' and ') + ' added');
     render();
@@ -198,8 +201,8 @@ async function hydrateThumbs() {
   const order = [...lib.items].sort((a, b) => onScreen.has(b.id) - onScreen.has(a.id));
   for (const it of order) {
     if (it.thumb || it.thumbTried) continue;
-    if (!it.file && !it.native) continue;
-    if (it.kind === 'audio' && !it.native) continue;     // no artwork reader for manual songs
+    if (!it.file && !it.native && !it.dpath) continue;
+    if (it.kind === 'audio' && !it.native && !it.dpath) continue;     // no artwork reader for manual songs
     it.thumbTried = true;
     const key = it.id + (it.native ? '|' + it.mtime : '');
     const cached = await idb.get(key);
@@ -210,7 +213,8 @@ async function hydrateThumbs() {
         const r = await ML.getThumbnail({ uri: it.nuri, path: it.npath, audio: it.kind === 'audio', width: 256 });
         data = { thumb: r.dataUrl || null, noArt: !r.dataUrl };
       } catch {}
-    } else data = await makeThumb(it.file);
+    } else if (it.dpath) data = await deskThumb(it);
+    else data = await makeThumb(it.file);
     if (data) { Object.assign(it, data); idb.set(key, data); updateRow(it); }
   }
   thumbBusy = false;
@@ -546,7 +550,7 @@ function sheetAdd() {
   b.onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
     closeSheet();
-    if (o === 'files') NATIVE && ML.pickFiles ? pickNative() : $('#pickFiles').click();
+    if (o === 'files') DESK ? deskPick() : NATIVE && ML.pickFiles ? pickNative() : $('#pickFiles').click();
     if (o === 'folder') $('#pickFolder').click();
     if (o === 'url') sheetUrl();
   };
@@ -657,7 +661,7 @@ async function sheetSettings() {
     ${seg('seekStep', 'i-fwd', 'Skip amount', 'Double-tap and skip buttons', [[5, '5s'], [10, '10s'], [15, '15s'], [30, '30s']])}
     ${seg('gestureSens', 'i-hand', 'Gesture sensitivity', 'Swipes for seek, volume and brightness', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']])}
     ${seg('autoHide', 'i-timer', 'Hide controls after', 'While a video is playing', [[2, '2s'], [3.5, '3.5s'], [5, '5s'], [8, '8s'], [0, 'Never']])}
-    ${NP ? seg('engine', 'i-film', 'Player engine', 'All formats plays MKV, AVI, AC3/DTS sound and built-in subtitles', [['auto', 'Auto'], ['web', 'Standard'], ['native', 'All formats']]) : ''}
+    ${NP || DESK ? seg('engine', 'i-film', 'Player engine', 'All formats plays MKV, AVI, AC3/DTS sound and built-in subtitles', [['auto', 'Auto'], ['web', 'Standard'], ['native', 'All formats']]) : ''}
     ${opt('night', 'i-moon', 'Night mode<small>Softer loud scenes, clearer dialogue</small>', sw(S.night))}
     ${opt('framePreview', 'i-pip', 'Frame preview while seeking<small>Shows the picture at that moment</small>', sw(S.framePreview))}
     ${opt('keepAwake', 'i-sun', 'Keep screen on while playing', sw(S.keepAwake))}
@@ -941,6 +945,11 @@ function exitFullscreen() {
 }
 function load(item, startAt) {
   const token = P.loadToken = (P.loadToken || 0) + 1;
+  if (DESK && item.dpath) {
+    saveProgress(true); P.v.pause(); $('#spinner').hidden = false;
+    deskProbe(item).then(() => { if (token === P.loadToken && !P.el.hidden) loadWith(item, startAt, 'web'); });
+    return;
+  }
   if (!P.nv || item.remote || !item.native) return loadWith(item, startAt, 'web');
   saveProgress(true); P.v.pause();
   $('#spinner').hidden = false;
@@ -954,8 +963,10 @@ function loadWith(item, startAt, engine) {
   P.cues = []; P.subDelay = 0; P.subBuf = null; P.subEnc = null; P.subEncForced = null; renderSub();
   P.zoom = 1;
   pvReset(); pvHide();
+  deskDetach();
   if (item.remote && P.boost) freshVideo();
   if (P.v.isNative) P.v.openItem(item, startAt);
+  else if (item.dpath) deskAttach(item);
   else if (item.remote) P.v.src = item.url;
   else if (item.src) P.v.src = item.src;
   else { item.url ||= URL.createObjectURL(item.file); P.v.src = item.url; }
@@ -972,6 +983,7 @@ function loadWith(item, startAt, engine) {
   if (P.v.isNative) { setVolume(P.vol ?? 1); applySubStyle(); syncNativeLayout(); }
   if (P.rec) stopRecording();
   if (item.sub) loadSubFile(item.sub, true);
+  else if (item.subPath) fetch(DESK.url('file', item.subPath)).then(r => r.blob()).then(b => { if (P.item === item) loadSubFile(new File([b], 'sub.srt'), true); }).catch(() => {});
   applyBright();
   if (!item.remote && !privateIds.has(item.id)) touchRecent(item);
   P.v.play().catch(() => {});
@@ -1073,7 +1085,7 @@ function onError() {
       : 'Your browser can’t decode this file’s video or sound.';
     return IS_ANDROID_BROWSER
       ? ptoast(why + ' The Android app plays it.', 'Get the app', () => window.open(ANDROID_APK_URL, '_blank', 'noopener'), 10000)
-      : ptoast(why + ' On a phone, the Open Player Android app plays it.', null, null, 10000);
+      : ptoast(why + ' The Open Player desktop app for Linux, Windows and Mac plays it.', 'Get it', () => window.open(new URL('../#desktop', location.href).href, '_blank', 'noopener'), 12000);
   }
   if ((code === 3 || code === 4) && NATIVE && P.item && !P.item.native) {
     return ptoast('This copy was added the old way. Add it again with ＋ › Pick videos to play it with the all-formats player.', 'Pick videos', () => { closePlayer(); pickNative(); }, 10000);
@@ -1099,7 +1111,7 @@ function touchRecent(it) {
 function closePlayer(fromPop) {
   saveProgress(true);
   const keepMusic = P.item?.kind === 'audio' && !P.v.paused;
-  if (!keepMusic) { P.v.pause(); clearSleep(); }
+  if (!keepMusic) { P.v.pause(); clearSleep(); deskDetach(); }
   P.el.hidden = true; closeSheet();
   P.loadToken = (P.loadToken || 0) + 1;
   if (P.v.isNative) setEngine('web');
@@ -1615,7 +1627,7 @@ function sheetMore() {
     (aTracks.length > 1 ? opt('atrack', 'i-headphones', 'Audio track', `<span class="val">${esc(trackLabel(aTracks.find(t => t.selected) || aTracks[0], aTracks.findIndex(t => t.selected)).name)}</span>`) : '') +
     (local ? opt('eq', 'i-eq', 'Equalizer', `<span class="val">${S.eqOn ? esc(S.eqPreset) : 'Off'}</span>`) : '') +
     (local ? opt('night', 'i-moon', 'Night mode<small>Softer explosions, clearer dialogue</small>', sw(S.night)) : '') +
-    (local && P.nv && P.item.native && P.item.kind !== 'audio' ? opt('engine', 'i-film', 'Player engine<small>Switch if a file won’t play or has no sound</small>', `<span class="val">${nat ? 'All formats' : 'Standard'}</span>`) : '') +
+    ((local && P.nv && P.item.native && P.item.kind !== 'audio') || P.item.dpath ? opt('engine', 'i-film', 'Player engine<small>Switch if a file won’t play or has no sound</small>', `<span class="val">${nat || P.hls ? 'All formats' : 'Standard'}</span>`) : '') +
     (local && !nat ? opt('adelay', 'i-vol', 'Audio delay', `<span class="val">${P.audioDelay ? '+' + Math.round(P.audioDelay * 1000) + ' ms' : 'Off'}</span>`) : '') +
     `<div class="group">Playback</div>` +
     opt('queue', 'i-queue', 'Play queue', `<span class="val">${P.idx + 1} of ${P.queue.length}</span>`) +
@@ -1638,6 +1650,7 @@ function sheetMore() {
     if (o === 'adelay') return sheetAudioDelay();
     if (o === 'atrack') return sheetAudioTracks();
     if (o === 'night') { toggleNight(); return; }
+    if (o === 'engine' && P.item.dpath) return switchEngine(P.hls ? 'web' : 'native', P.hls ? 'Switching to the standard player…' : 'Converting this file as it plays…');
     if (o === 'engine') return switchEngine(nat ? 'web' : 'native', nat ? 'Switching to the standard player…' : 'Switching to the all-formats player…');
     if (o === 'sleep') return sheetSleep();
     if (o === 'info') return sheetMediaInfo();
@@ -2483,6 +2496,7 @@ function migrateId(oldId, newId) {
 function forgetItem(it, deleted) {
   lib.items = lib.items.filter(i => i !== it); lib.byId.delete(it.id);
   if (it.picked) { picked = picked.filter(p => 'pk:' + p.uri !== it.id); store.set('picked', picked); }
+  if (it.dpath) deskSave();
   if (it.url) URL.revokeObjectURL(it.url);
   if (deleted) {
     delete progress[it.id]; store.set('progress', progress);
@@ -2959,6 +2973,10 @@ render();
 setupSW();
 importShared();
 (async () => {
+  if (DESK) {
+    await deskRestore();
+    DESK.onOpenFiles(files => { const its = deskAddPaths(files.map(p => ({ path: p })), 'Opened files'); if (its[0]) { if (!P.el.hidden) closePlayer(true); openPlayer(its[0], its.filter(i => i.kind === its[0].kind)); } });
+  }
   if (NATIVE) {
     await loadAppInfo();
     await refreshAccess();
@@ -3004,6 +3022,7 @@ function setEngine(kind) {
 function switchEngine(kind, why) {
   if (!P.item) return;
   P.engineFor[P.item.id] = kind;
+  if (P.item.dpath) P.deskMode[P.item.id] = kind === 'native' ? 'hls' : 'direct';
   const t = P.v.currentTime || 0;
   if (why) ptoast(why);
   load(P.item, t > 1 ? t : undefined);
@@ -3024,7 +3043,9 @@ const CODEC_NAMES = {
   'audio/vnd.dts': 'DTS', 'audio/vnd.dts.hd': 'DTS-HD', 'audio/mp4a-latm': 'AAC', 'audio/mpeg': 'MP3', 'audio/opus': 'Opus',
   'audio/vorbis': 'Vorbis', 'audio/flac': 'FLAC', 'audio/raw': 'PCM',
   'text/x-ssa': 'ASS', 'application/x-subrip': 'SRT', 'text/vtt': 'WebVTT', 'application/pgs': 'PGS (image)',
-  'application/vobsub': 'VobSub (image)', 'application/dvbsubs': 'DVB (image)', 'application/ttml+xml': 'TTML', 'application/x-quicktime-tx3g': 'Timed text',
+  'application/vobsub': 'VobSub (image)',
+  ac3: 'Dolby Digital (AC3)', eac3: 'Dolby Digital Plus', truehd: 'Dolby TrueHD', dts: 'DTS', aac: 'AAC', mp3: 'MP3', opus: 'Opus', vorbis: 'Vorbis', flac: 'FLAC',
+  subrip: 'SRT', ass: 'ASS', ssa: 'SSA', mov_text: 'Timed text', webvtt: 'WebVTT', 'application/dvbsubs': 'DVB (image)', 'application/ttml+xml': 'TTML', 'application/x-quicktime-tx3g': 'Timed text',
 };
 const langName = code => {
   if (!code || code === 'und') return '';
@@ -3036,7 +3057,7 @@ function trackLabel(t, i) {
   const bits = [CODEC_NAMES[t.codec] || (t.codec || '').replace(/^\w+\//, '').toUpperCase(), t.type === 'audio' ? ch : '', t.forced ? 'Forced' : ''].filter(Boolean);
   return { name, info: bits.join(' · ') };
 }
-const nativeTracks = type => (P.v.isNative ? P.v.tracks.filter(t => t.type === type) : []);
+const nativeTracks = type => (P.v.isNative ? P.v.tracks : (P.item?.dpath && P.deskTracks) || []).filter(t => t.type === type);
 function onNativeTracks() {
   const audio = nativeTracks('audio'), text = nativeTracks('text');
   const it = P.item; if (!it || P.tracksHinted === it.id) return;
@@ -3058,8 +3079,9 @@ function sheetAudioTracks() {
   b.onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
     const [, g, t] = o.split(':');
-    NP.selectTrack({ type: 'audio', group: +g, track: +t }).catch(() => ptoast('Couldn’t switch audio track'));
     closeSheet();
+    if (P.item?.dpath) return deskAudio(+g);
+    NP.selectTrack({ type: 'audio', group: +g, track: +t }).catch(() => ptoast('Couldn’t switch audio track'));
   };
 }
 function embeddedSubsHtml() {
@@ -3074,6 +3096,7 @@ function embeddedSubsHtml() {
     }).join('');
 }
 function pickEmbeddedSub(o) {
+  if (P.item?.dpath) return deskSub(o);
   if (o === 'st:off') return NP.selectTrack({ type: 'text', off: true }).catch(() => {});
   const [, g, t] = o.split(':');
   if (P.cues.length) P.subOn = false;    // one subtitle at a time
@@ -3253,14 +3276,124 @@ function kidsTimeUp() {
 $('#btnKids').onclick = exitKids;
 
 /* automatic fallback: the standard engine sometimes plays the picture but no sound (AC3/DTS) */
-function canGoNative(it) { return !!(P.nv && it && it.native && !it.remote && P.engineFor[it.id] !== 'web' && (it.npath || it.nuri)); }
+function canGoNative(it) {
+  if (DESK && it?.dpath) return !P.hls && P.deskMode[it.id] !== 'direct';
+  return !!(P.nv && it && it.native && !it.remote && P.engineFor[it.id] !== 'web' && (it.npath || it.nuri));
+}
 function silentAudioCheck() {
   const v = P.v, it = P.item;
   if (v.isNative || !it || it.kind === 'audio' || P.silentCheck === -1 || !canGoNative(it) || S.engine === 'web') return;
   if (v.currentTime < 2.5 || v.paused) return;
   P.silentCheck = -1;
   if (!('webkitAudioDecodedByteCount' in v)) return;
-  const hasAudio = it.engineProbe ? it.engineProbe.audioTracks > 0 : true;
+  const hasAudio = it.engineProbe ? it.engineProbe.audioTracks > 0 : it.deskProbe ? it.deskProbe.audio.length > 0 : true;
   if (hasAudio && v.webkitAudioDecodedByteCount === 0) switchEngine('native', 'No sound with the standard player · switching to all formats…');
 }
 applyKidsUi();
+
+/* =================================================================
+   Desktop app (Linux, Windows, Mac): files the browser engine can't decode are
+   converted by FFmpeg into HLS segments as they play (see desktop/main.js).
+   ================================================================= */
+P.deskMode = {};    // item id → 'direct' | 'hls'
+P.deskAudio = {};   // item id → audio stream index
+P.hls = null;
+const DESK_TEXT_SUBS = ['subrip', 'ass', 'ssa', 'mov_text', 'webvtt', 'text'];
+async function deskProbe(it) {
+  if (!it.deskProbe) { try { it.deskProbe = await DESK.probe(it.dpath); } catch {} }
+  return it.deskProbe;
+}
+function deskModeFor(it) {
+  if (P.deskMode[it.id]) return P.deskMode[it.id];
+  if (S.engine === 'web') return 'direct';
+  if (S.engine === 'native') return 'hls';
+  return it.deskProbe && !it.deskProbe.direct ? 'hls' : 'direct';
+}
+function deskDetach() { if (P.hls) { try { P.hls.destroy(); } catch {} P.hls = null; } }
+function deskAttach(it) {
+  const info = it.deskProbe || { audio: [], subs: [] };
+  const aIdx = P.deskAudio[it.id] ?? Math.max(0, info.audio.findIndex(a => a.def));
+  P.deskTracks = [
+    ...info.audio.map((a, i) => ({ type: 'audio', group: i, track: 0, label: a.title, language: a.language, codec: a.codec, channels: a.channels, selected: i === aIdx, supported: true })),
+    ...info.subs.filter(s => DESK_TEXT_SUBS.includes(s.codec)).map(s => ({ type: 'text', group: s.index, track: 0, label: s.title, language: s.language, codec: s.codec, forced: s.forced, selected: false, supported: true })),
+  ];
+  if (deskModeFor(it) === 'hls' && window.Hls?.isSupported()) {
+    const hls = P.hls = new Hls({ maxBufferLength: 40, backBufferLength: 60, enableWorker: true, fragLoadingTimeOut: 60000, manifestLoadingTimeOut: 30000 });
+    hls.loadSource(DESK.url('hls/index.m3u8', it.dpath, `&a=${aIdx}`));
+    hls.attachMedia(P.v);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => P.v.play().catch(() => {}));
+    hls.on(Hls.Events.ERROR, (_e, d) => { if (d.fatal && P.hls === hls) { $('#spinner').hidden = true; ptoast('Couldn’t convert this file for playback', null, null, 6000); } });
+  } else P.v.src = DESK.url('file', it.dpath);
+  onNativeTracks();
+}
+function deskAudio(idx) {
+  const it = P.item; if (!it) return;
+  P.deskAudio[it.id] = idx;
+  P.deskMode[it.id] = 'hls';      // choosing a language needs the converter
+  const t = P.v.currentTime || 0;
+  ptoast('Switching audio track…');
+  load(it, t > 1 ? t : undefined);
+}
+async function deskSub(o) {
+  const it = P.item; if (!it) return;
+  (P.deskTracks || []).forEach(t => { if (t.type === 'text') t.selected = o === `st:${t.group}:0`; });
+  if (o === 'st:off') { P.cues = []; P.subBuf = null; renderSub(); return; }
+  const idx = +o.split(':')[1];
+  ptoast('Loading subtitles…');
+  try {
+    const txt = await (await fetch(DESK.url('sub', it.dpath, `&s=${idx}`))).text();
+    if (P.item !== it) return;
+    P.subOn = true;
+    await loadSubFile(new File([txt], 'embedded.srt'));
+  } catch { ptoast('Couldn’t read those subtitles'); }
+}
+async function deskThumb(it) {
+  const info = await deskProbe(it);
+  const out = { dur: info?.duration || it.dur || 0 };
+  if (it.kind === 'audio' || !info?.video) return { ...out, thumb: null, noArt: true };
+  try {
+    const blob = await (await fetch(DESK.url('thumb', it.dpath))).blob();
+    if (blob.size) out.thumb = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.onerror = () => r(null); fr.readAsDataURL(blob); });
+  } catch {}
+  return out;
+}
+/* library entries for files picked in the desktop app, kept across restarts */
+function deskSave() {
+  store.set('deskFiles', lib.items.filter(i => i.dpath && !i.remote).map(i => ({ path: i.dpath, name: i.name, size: i.size, mtime: i.mtime, folder: i.folder, kind: i.kind, subPath: i.subPath || null })));
+}
+function deskAddPaths(list, folderLabel) {
+  const subs = new Map(list.filter(f => SUB_EXT.test(f.path)).map(f => [f.path.replace(/\.[^./\\]+$/, '').toLowerCase(), f.path]));
+  const out = [];
+  for (const f of list) {
+    const name = f.name || f.path.split(/[\\/]/).pop();
+    const isAud = AUDIO_EXT.test(name) || /\.(ac3|dts|wma)$/i.test(name);
+    const isVid = !isAud && (VIDEO_EXT.test(name) || /\.(vob|divx|asf|rm|rmvb)$/i.test(name));
+    if (!isAud && !isVid) continue;
+    const id = `${name}|${f.size ?? 0}|${Math.round(f.mtime || 0)}`;
+    let it = lib.byId.get(id) || lib.items.find(i => i.dpath === f.path);
+    if (!it) {
+      const dir = f.path.split(/[\\/]/).slice(-2, -1)[0];
+      it = { id, kind: isAud ? 'audio' : 'video', file: null, name, size: f.size || 0, mtime: Math.round(f.mtime || 0), folder: f.folder || dir || folderLabel,
+        url: null, dur: 0, thumb: null, sub: null, dpath: f.path, subPath: f.subPath || subs.get(f.path.replace(/\.[^./\\]+$/, '').toLowerCase()) || null };
+      if (isAud) { it.title = baseName(name); it.artist = ''; it.album = it.folder; }
+      lib.items.push(it); lib.byId.set(id, it);
+    }
+    out.push(it);
+  }
+  if (out.length) { adoptMovedHistory(out); deskSave(); render(); hydrateThumbs(); }
+  return out;
+}
+async function deskPick() {
+  const files = await DESK.pick();
+  if (!files.length) return;
+  const added = deskAddPaths(files, 'Added files');
+  snack(added.length ? `${plural(added.length, 'file')} added` : 'No playable videos or music in that selection');
+}
+async function deskRestore() {
+  const saved = store.get('deskFiles', []);
+  if (!saved.length) return;
+  const ok = new Set(await DESK.exists(saved.map(f => f.path)));
+  const keep = saved.filter(f => ok.has(f.path));
+  await DESK.allow([...keep.map(f => f.path), ...keep.map(f => f.subPath).filter(Boolean)]);
+  deskAddPaths(keep);
+}

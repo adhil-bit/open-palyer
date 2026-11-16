@@ -1,0 +1,92 @@
+name: Desktop build & release
+
+# Builds Open Player for Linux (AppImage, .deb), Windows (installer) and Mac (.dmg) and
+# publishes them on the "desktop" release with stable download links.
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", "desktop/**", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  APP_VER: "1.6"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+      - name: Version
+        run: npm version "${APP_VER}.${{ github.run_number }}" --no-git-tag-version --allow-same-version
+      - name: Build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"   # no paid code-signing certificates
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist
+      - name: Collect
+        run: |
+          mkdir -p out
+          find dist -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.exe' -o -name '*.dmg' \) -exec cp {} out/ \;
+          ls -la out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-${{ matrix.os }}
+          path: desktop/out/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: files
+          merge-multiple: true
+      - name: Checksums and notes
+        run: |
+          cd files
+          sha256sum * > SHA256SUMS-desktop.txt
+          cat SHA256SUMS-desktop.txt
+          {
+            echo "Open Player desktop ${APP_VER}.${{ github.run_number }} (commit ${GITHUB_SHA::7})"
+            echo
+            echo "No ads, no tracking. Plays MKV, AVI, HEVC (x265), AC3, DTS and more with its built-in FFmpeg engine."
+            echo
+            echo "| System | Download |"
+            echo "|---|---|"
+            echo "| Linux (any distro) | \`OpenPlayer-linux-x86_64.AppImage\`: make it executable, then run |"
+            echo "| Ubuntu / Debian | \`OpenPlayer-linux-amd64.deb\`: \`sudo apt install ./OpenPlayer-linux-amd64.deb\` |"
+            echo "| Windows | \`OpenPlayer-win-x64.exe\` |"
+            echo "| Mac (Apple silicon) | \`OpenPlayer-mac-arm64.dmg\`: first launch, right-click the app → Open |"
+            echo
+            echo "The Windows and Mac builds aren't signed with a paid certificate, so Windows SmartScreen and macOS Gatekeeper show a warning the first time."
+            echo
+            echo "SHA-256 checksums:"
+            echo '```'
+            cat SHA256SUMS-desktop.txt
+            echo '```'
+          } > ../notes.md
+      - name: Publish to the "desktop" release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: desktop
+          name: Open Player for desktop
+          body_path: notes.md
+          make_latest: false
+          files: files/*

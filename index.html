@@ -234,6 +234,16 @@
     .anim thead .us { box-shadow: inset 0 0 0 var(--sub); }
     .anim.seen thead .us { box-shadow: inset 0 4px 0 var(--sub); transition: box-shadow .5s; }
 
+    /* desktop downloads */
+    .dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
+    .dl a { display: block; padding: 16px 18px; border: 1.5px solid var(--line); border-radius: 10px; text-decoration: none; background: var(--raised); }
+    .dl a:hover { border-color: var(--ink); }
+    .dl a.mine { border-color: var(--ink); box-shadow: inset 0 -4px 0 var(--sub); }
+    .dl b { display: block; font-size: 17px; }
+    .dl span { color: var(--soft); font-size: 14.5px; }
+    .fine code { font: 13.5px ui-monospace, Menlo, Consolas, monospace; background: var(--raised); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
+    @media (max-width: 860px) { .dl { grid-template-columns: 1fr 1fr; } }
+
     /* every device */
     .devices { margin-top: 30px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
     .devices h3 { font-size: 17px; }
@@ -301,7 +311,7 @@
   <nav>
     <div class="wrap">
       <a class="brand" href="#top"><img src="app/icons/icon.svg" alt="">Open Player</a>
-      <div class="navlinks"><a href="#compare">Compare</a><a href="#features">Features</a><a href="#use">How to use</a><a href="#privacy">Privacy</a><a href="#verify">Verify</a><a href="#faq">FAQ</a></div>
+      <div class="navlinks"><a href="#compare">Compare</a><a href="#features">Features</a><a href="#desktop">Desktop</a><a href="#use">How to use</a><a href="#privacy">Privacy</a><a href="#verify">Verify</a><a href="#faq">FAQ</a></div>
       <a class="navcta" href="#download">Download</a>
     </div>
   </nav>
@@ -328,6 +338,7 @@
             <a class="btn main" data-apk href="https://github.com/adhil-bit/open-palyer/releases/latest" rel="noopener"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>
             <a class="btn plain" href="app/"><svg><use href="#globe"/></svg><span>Open in your browser<small>iPhone, iPad, Windows, Mac, Linux</small></span></a>
           </div>
+          <p class="runs">On a computer? <a href="#desktop">Get the desktop app</a> for Linux, Windows and Mac. It plays MKV, x265 and Dolby sound that browsers can’t.</p>
           <a class="verified-line" href="#verify" id="verifiedLine" hidden><svg><use href="#shield"/></svg><span id="verifiedText"></span></a>
         </div>
       </div>
@@ -355,8 +366,8 @@
             <tr><td>Private folder with PIN</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td></tr>
 
             <tr class="group-row"><td colspan="5">Playing</td></tr>
-            <tr><td>Format support</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Wide in the Android app</span><small>MKV, AVI, FLV, TS and VOB with AC3, DTS and TrueHD sound (FFmpeg). The web app plays what the browser plays.</small></td><td><span class="v y"><svg><use href="#ok"/></svg>Very wide</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Widest</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Wide</span><small>Including AC3, DTS and TrueHD audio</small></td></tr>
-            <tr><td>Built-in subtitles and audio languages</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes, in the Android app</span><small>SRT, ASS and PGS tracks; the web app uses .srt and .vtt files</small></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td></tr>
+            <tr><td>Format support</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Wide in the Android and desktop apps</span><small>MKV, AVI, x265, TS and VOB with AC3, DTS and TrueHD sound (FFmpeg). The web app plays what the browser plays.</small></td><td><span class="v y"><svg><use href="#ok"/></svg>Very wide</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Widest</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Wide</span><small>Including AC3, DTS and TrueHD audio</small></td></tr>
+            <tr><td>Built-in subtitles and audio languages</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes, in the Android and desktop apps</span><small>Android: SRT, ASS and PGS tracks. Desktop: text tracks. Web app: .srt and .vtt files</small></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td></tr>
             <tr><td>Gestures, picture-in-picture, speed, screen lock</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td></tr>
             <tr><td>Night audio mode</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes</span><small>Softer explosions, clearer dialogue</small></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td><td><span class="v p"><svg><use href="#half"/></svg>Desktop only</span><small>Compressor filter</small></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td></tr>
             <tr><td>Resume after moving or renaming a file</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes</span></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td></tr>
@@ -366,7 +377,7 @@
             <tr><td>Storage cleaner</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes</span><small>Duplicate copies, watched and largest videos</small></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td></tr>
             <tr><td>Help with Telegram downloads</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Built in</span><small>Step-by-step guide, “Open with”, hidden-folder search</small></td><td><span class="v p"><svg><use href="#half"/></svg>Open with</span></td><td><span class="v p"><svg><use href="#half"/></svg>Open with</span></td><td><span class="v p"><svg><use href="#half"/></svg>Open with</span></td></tr>
             <tr><td>Cache you can see and clear</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes</span><small>Storage meter, one-tap refresh</small></td><td><span class="v p"><svg><use href="#half"/></svg>Android settings</span></td><td><span class="v p"><svg><use href="#half"/></svg>Android settings</span></td><td><span class="v p"><svg><use href="#half"/></svg>Android settings</span></td></tr>
-            <tr><td>Runs in a browser on any device</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes</span><small>Android app, plus an installable web app for iPhone, PC and Mac</small></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td><td><span class="v p"><svg><use href="#half"/></svg>Separate apps</span><small>One per system</small></td><td><span class="v n"><svg><use href="#no"/></svg>Android only</span></td></tr>
+            <tr><td>Runs in a browser on any device</td><td class="us"><span class="v y"><svg><use href="#ok"/></svg>Yes</span><small>Android and desktop apps, plus an installable web app for iPhone and any browser</small></td><td><span class="v n"><svg><use href="#no"/></svg>No</span></td><td><span class="v p"><svg><use href="#half"/></svg>Separate apps</span><small>One per system</small></td><td><span class="v n"><svg><use href="#no"/></svg>Android only</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -445,6 +456,21 @@
           </ul>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- DESKTOP -->
+  <section id="desktop">
+    <div class="wrap">
+      <h2>Open Player on your computer</h2>
+      <p class="intro">Browsers can’t decode HEVC (x265) video or AC3, DTS and TrueHD sound, which most MKV downloads use. The desktop app has FFmpeg built in, so those files play, with audio-language choice and the subtitles inside the file.</p>
+      <div class="dl" id="dlList">
+        <a data-os="linux" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-linux-x86_64.AppImage"><b>Linux</b><span>AppImage, runs on any distro</span></a>
+        <a data-os="linux" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-linux-amd64.deb"><b>Ubuntu and Debian</b><span>.deb package</span></a>
+        <a data-os="win" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-win-x64.exe"><b>Windows</b><span>Installer, 64-bit</span></a>
+        <a data-os="mac" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-mac-arm64.dmg"><b>Mac</b><span>Apple silicon (M1 and newer)</span></a>
+      </div>
+      <p class="fine">Ubuntu: <code>sudo apt install ./OpenPlayer-linux-amd64.deb</code>, or make the AppImage executable and double-click it. The Windows and Mac builds aren’t signed with a paid certificate, so the first launch shows a warning: choose “More info › Run anyway” on Windows, or right-click › Open on a Mac. Checksums are on the <a href="https://github.com/adhil-bit/open-palyer/releases/tag/desktop">desktop release page</a>.</p>
     </div>
   </section>
 
@@ -555,7 +581,7 @@
         <details><summary>Android app or web version: which should I use?</summary><p>On Android, use the app: it shows all your videos and music automatically, plays more formats, opens files from other apps and finds hidden folders. On computers, iPhones and iPads, use the web version; it has the same player, and you add files yourself.</p></details>
         <details><summary>Why can’t I see my Telegram downloads?</summary><p>Newer Telegram versions and Plus Messenger keep downloads in a private folder that Android doesn’t let any other app open, including VLC and MX Player. In Telegram, use Share or Open with, then Open Player, to play them straight away, or “Save to Downloads” so they appear in your library. The app has a step-by-step guide in Settings.</p></details>
         <details><summary>Android says “install unknown apps”. Is that safe?</summary><p>Android shows this for any app that isn’t from the Play Store. Allow it once for your browser or file manager, and turn it off again afterwards if you like. To be sure your copy is genuine, compare its checksum and signing fingerprint with the ones in <a href="#verify">Check that your copy is genuine</a>.</p></details>
-        <details><summary>Which formats does it play?</summary><p>The Android app plays MP4, MKV, WebM, MOV, AVI, FLV, TS, M2TS, MPEG and VOB, including AC3, E-AC3, DTS and TrueHD sound, plus music like MP3, AAC, FLAC, WAV, OGG and Opus. The web app plays what your browser supports: MP4, WebM and most MKV files.</p></details>
+        <details><summary>Which formats does it play?</summary><p>The Android app plays MP4, MKV, WebM, MOV, AVI, FLV, TS, M2TS, MPEG and VOB, including AC3, E-AC3, DTS and TrueHD sound, plus music like MP3, AAC, FLAC, WAV, OGG and Opus. The desktop app for Linux, Windows and Mac plays the same. The web app plays what your browser supports: MP4, WebM and MKV files with H.264 video and AAC sound.</p></details>
         <details><summary>Something looks out of date after an update.</summary><p>Open Settings › Storage &amp; cache › <b>Refresh app cache</b>. It clears the stored app files and loads the newest version. Your library, history and settings are kept.</p></details>
       </div>
     </div>
@@ -613,6 +639,12 @@
         $('verifiedLine').hidden = false;
       }
     })();
+    // Highlight the download for this computer.
+    (() => {
+      const ua = navigator.userAgent, os = /Windows/.test(ua) ? 'win' : /Mac OS X/.test(ua) && !/iPhone|iPad/.test(ua) ? 'mac' : /Linux/.test(ua) && !/Android/.test(ua) ? 'linux' : '';
+      if (os) document.querySelectorAll(`#dlList [data-os="${os}"]`).forEach(a => a.classList.add('mine'));
+    })();
+
     /* ---------- motion (skipped when the visitor prefers reduced motion) ---------- */
     const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 

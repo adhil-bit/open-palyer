@@ -125,6 +125,28 @@ Newer Telegram versions keep downloads in their own private storage (`Android/da
 2. Use **Save to Downloads / Save to Gallery** so a copy lands in shared storage, where Open Player finds it.
 3. To stop re-downloading: Telegram → Settings → Data and Storage → Storage Usage → **Keep Media: Forever**.
 
+## Desktop app (Linux, Windows, Mac)
+
+Browsers can't decode HEVC (x265) video or AC3/DTS/TrueHD sound, so many MKV downloads won't play in the web app on a computer. The desktop app (`desktop/`, Electron) shows the same player and adds a bundled FFmpeg:
+
+- Files the browser engine can play are opened directly.
+- Anything else is converted as it plays into short HLS segments (H.264 + AAC), so seeking, the equalizer, screenshots and recording keep working.
+- **Audio track** lists every language in the file; **CC** lists the text subtitle tracks inside it.
+- "Open with" / double-click from the file manager, drag and drop, and the library is remembered between launches.
+
+Downloads (stable links, updated by `.github/workflows/desktop.yml` on every push that touches `app/` or `desktop/`):
+
+| System | File |
+|---|---|
+| Linux, any distro | `OpenPlayer-linux-x86_64.AppImage` |
+| Ubuntu / Debian | `OpenPlayer-linux-amd64.deb` (`sudo apt install ./OpenPlayer-linux-amd64.deb`) |
+| Windows | `OpenPlayer-win-x64.exe` |
+| Mac (Apple silicon) | `OpenPlayer-mac-arm64.dmg` |
+
+They're on the [`desktop` release](https://github.com/adhil-bit/open-palyer/releases/tag/desktop). Windows and Mac builds aren't signed with a paid certificate, so SmartScreen / Gatekeeper warn on first launch.
+
+Run it from source: `cd desktop && npm install && npm start`.
+
 ## Web app
 
 1. Host the folder over HTTPS (GitHub Pages works — see below).
@@ -161,6 +183,7 @@ Installed apps will show "A new version is ready — Reload". Users can also for
 | `app/sw.js` | Offline cache, updates, share target |
 | `app/manifest.webmanifest` | Install info, share target, file handling |
 | `sw.js` (root) | Retires the old service worker from before the player moved to `app/` |
+| `desktop/` | Desktop app (Electron + FFmpeg) for Linux, Windows and Mac |
 | `android/` | Android app (Capacitor); media library in `MediaLibraryPlugin.java`, all-formats engine in `NativePlayerPlugin.java` |
 | `scripts/build-www.mjs` | Copies the web app into the Android build |
 | `.github/workflows/android.yml` | Builds the APK and publishes it to Releases |
