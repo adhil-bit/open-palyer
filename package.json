@@ -1,12 +1,13 @@
 {
   "name": "open-player",
-  "version": "1.5.0",
+  "version": "1.6.0",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "description": "Open Player — ad-free video and music player (web + Android)",
   "scripts": {
     "build:www": "node scripts/build-www.mjs",
     "sync": "npm run build:www && npx cap sync android",
-    "apk": "npm run sync && cd android && ./gradlew assembleFullDebug"
+    "apk": "npm run sync && cd android && ./gradlew assembleFullRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.2",

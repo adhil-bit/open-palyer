@@ -16,14 +16,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  APP_VER: "1.5"
+  APP_VER: "1.6"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # true when the Google Play upload key has been added as repository secrets (see README)
-      HAS_UPLOAD_KEY: ${{ secrets.UPLOAD_KEYSTORE_BASE64 != '' }}
+      # true when the private signing key has been added as repository secrets (see README)
+      HAS_SIGNING_KEY: ${{ secrets.SIGNING_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -54,37 +54,48 @@ jobs:
           npm run build:www
           npx cap sync android
 
+      - name: Signing key
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ "$HAS_SIGNING_KEY" = "true" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/signing.jks"
+            echo "SIGNING_KEYSTORE=$RUNNER_TEMP/signing.jks" >> "$GITHUB_ENV"
+            echo "Signing with the private release key."
+          else
+            echo "::warning::No SIGNING_KEYSTORE_BASE64 secret: this APK is signed with the public test key. Add the private key before sharing releases (see README)."
+          fi
+
       - name: Build the APK (direct download, full edition)
         working-directory: android
         env:
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: ${{ steps.ver.outputs.version }}
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleFullDebug --no-daemon --stacktrace
+          ./gradlew assembleFullRelease --no-daemon --stacktrace
 
-      - name: Build the Google Play bundle (when the upload key is set up)
-        if: env.HAS_UPLOAD_KEY == 'true'
+      - name: Build the Google Play bundle (only with the private key)
+        if: env.HAS_SIGNING_KEY == 'true'
         working-directory: android
         env:
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: ${{ steps.ver.outputs.version }}
-          UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
-          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
-          UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
-          UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
-        run: |
-          echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
-          export UPLOAD_KEYSTORE="$RUNNER_TEMP/upload.jks"
-          ./gradlew bundlePlayRelease --no-daemon --stacktrace
-          rm -f "$RUNNER_TEMP/upload.jks"
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: ./gradlew bundlePlayRelease --no-daemon --stacktrace
 
       - name: Collect release files
         env:
           V: ${{ steps.ver.outputs.version }}
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/full/debug/app-full-debug.apk "dist/OpenPlayer-$V.apk"
+          cp android/app/build/outputs/apk/full/release/app-full-release.apk "dist/OpenPlayer-$V.apk"
+          rm -f "$RUNNER_TEMP/signing.jks"
           AAB=android/app/build/outputs/bundle/playRelease/app-play-release.aab
           if [ -f "$AAB" ]; then cp "$AAB" "dist/OpenPlayer-$V-play.aab"; fi
           ls -l dist
@@ -195,9 +206,14 @@ jobs:
             *)       VT="Not scanned for this release" ;;
           esac
           if [ -n "$ATTEST_URL" ]; then PROV="[GitHub build attestation]($ATTEST_URL)"; else PROV="Available once the source code is public"; fi
+          if [ "$HAS_SIGNING_KEY" != "true" ]; then
+            KEYNOTE="> ⚠️ **Test build:** signed with the public test key, not the official release key. Don't share this one."
+          else KEYNOTE=""; fi
           AAB_NOTE=""
           if [ -f "dist/OpenPlayer-$V-play.aab" ]; then AAB_NOTE="- \`OpenPlayer-$V-play.aab\`: Google Play edition, for uploading in Play Console (not for installing)."; fi
           cat > "$RUNNER_TEMP/notes.md" <<EOF
+          $KEYNOTE
+
           **Install:** download \`OpenPlayer-$V.apk\` on your phone and open it. Android asks once to allow installs from your browser or file manager.
 
           No ads. No tracking. Your videos and music never leave your phone.

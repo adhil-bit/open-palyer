@@ -62,9 +62,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -424,6 +426,40 @@ public class MediaLibraryPlugin extends Plugin {
             try { cr.delete(uri, null, null); } catch (Exception ignored) {}
             if (p != null) scan(p);
             call.resolve(outcome(true, false));
+        } catch (Exception e) {
+            call.reject("Could not delete: " + e.getMessage());
+        }
+    }
+
+    /** Storage cleaner: delete several files with one system confirmation (Android 11+). */
+    @PluginMethod
+    public void deleteMany(PluginCall call) {
+        JSArray items = call.getArray("items");
+        if (items == null || items.length() == 0) { call.resolve(outcome(true, false)); return; }
+        final ContentResolver cr = getContext().getContentResolver();
+        try {
+            List<Uri> uris = new ArrayList<>();
+            List<String> paths = new ArrayList<>();
+            for (int i = 0; i < items.length(); i++) {
+                org.json.JSONObject o = items.getJSONObject(i);
+                Uri u = mediaUri(o.optString("uri", null));
+                String p = o.isNull("path") ? null : o.optString("path", null);
+                if (u != null) uris.add(u);
+                if (p != null) paths.add(p);
+            }
+            if (hasAllFiles() && paths.size() == items.length()) {
+                for (String p : paths) { File f = new File(p); if (f.exists()) f.delete(); }
+                for (Uri u : uris) { try { cr.delete(u, null, null); } catch (Exception ignored) {} }
+                scan(paths.toArray(new String[0]));
+                call.resolve(outcome(true, false));
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= 30 && uris.size() == items.length()) {
+                PendingIntent pi = MediaStore.createDeleteRequest(cr, uris);
+                askUser(call, pi.getIntentSender(), () -> call.resolve(outcome(true, false)));
+                return;
+            }
+            call.reject("Batch delete not available");   // the app falls back to one file at a time
         } catch (Exception e) {
             call.reject("Could not delete: " + e.getMessage());
         }

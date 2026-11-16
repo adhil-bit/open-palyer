@@ -24,6 +24,7 @@
       </div>
       <div class="appbar-actions">
         <button class="icon-btn" id="btnSearch" aria-label="Search"><svg><use href="#i-search"/></svg></button>
+        <button class="icon-btn" id="btnKids" aria-label="Exit kids mode" hidden><svg><use href="#i-lock"/></svg></button>
         <button class="icon-btn" id="btnSort" aria-label="Sort"><svg><use href="#i-sort"/></svg></button>
         <button class="icon-btn" id="btnSettings" aria-label="Settings"><svg><use href="#i-settings"/></svg></button>
       </div>
@@ -40,6 +41,7 @@
       <button role="tab" class="tab" data-tab="playlists">Playlists</button>
       <button role="tab" class="tab" data-tab="recent">Recent</button>
     </nav>
+    <div class="kidsbar" id="kidsBar" hidden><svg><use href="#i-user"/></svg><b>Kids mode</b><span id="kidsLeft"></span></div>
     <div class="chips subchips" id="musicChips" hidden>
       <button data-mv="songs">Songs</button><button data-mv="albums">Albums</button><button data-mv="artists">Artists</button>
     </div>

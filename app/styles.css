@@ -505,3 +505,29 @@ body.has-mini .list { padding-bottom: calc(var(--safe-b) + 170px); }
 .kv b { font-weight: 600; text-align: right; }
 .kv.col { flex-direction: column; gap: 6px; }
 .kv code { font: 600 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; color: var(--text); background: var(--surface-2); padding: 8px 10px; border-radius: 10px; -webkit-user-select: all; user-select: all; }
+
+/* ---------- v1.6: all-formats engine (native video drawn behind a transparent web page) ---------- */
+html.native-engine, html.native-engine body { background: transparent !important; }
+html.native-engine #library, html.native-engine #mini { visibility: hidden; }
+#player.native-engine { background: transparent; }
+#player.native-engine #video { visibility: hidden !important; }
+#player.native-engine .stage { background: transparent; }
+
+/* storage cleaner & kids mode lists */
+.crow { display: flex; align-items: center; gap: 12px; padding: 10px 20px; min-height: 56px; cursor: pointer; }
+.crow input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+.cmeta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cmeta b { font-weight: 600; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmeta small { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.csize { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; flex: none; }
+.cfoot { position: sticky; bottom: 0; padding: 12px 20px 8px; background: var(--surface); }
+.cfoot .btn { width: 100%; justify-content: center; }
+.cfoot .btn:disabled { opacity: .45; }
+.kseg { margin: 4px 20px 10px; }
+.kidsbar { display: flex; align-items: center; gap: 8px; margin: 4px 16px 6px; padding: 8px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); font-size: 13.5px; }
+.kidsbar svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+.kidsbar span { margin-left: auto; color: var(--muted); }
+body.kids .tab[data-tab="music"], body.kids .tab[data-tab="playlists"], body.kids .tab[data-tab="recent"],
+body.kids #fab, body.kids #btnSettings, body.kids #btnSort, body.kids .row[data-private],
+body.kids #mini { display: none !important; }

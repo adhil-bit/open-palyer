@@ -9,7 +9,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI passes the build number so every APK can install over the previous one.
         versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
-        versionName System.getenv("VERSION_NAME") ?: "1.5.0"
+        versionName System.getenv("VERSION_NAME") ?: "1.6.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -22,26 +22,29 @@ android {
     //   play - for Google Play, whose policy doesn't allow "All files access" for video players.
     flavorDimensions "store"
     productFlavors {
-        full { dimension "store" }
-        play { dimension "store" }
+        full {
+            dimension "store"
+            // The direct APK ships the FFmpeg decoders for phones only (keeps the download smaller).
+            ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+        }
+        play { dimension "store" }   // Play delivers the right decoders per phone from the .aab
     }
     signingConfigs {
-        // A fixed key so every new APK installs over the last one.
-        // Move this to a private key in GitHub Secrets before the repo goes public.
+        // Public test key: only for local builds and forks. Official releases are signed with
+        // the private key from the SIGNING_* GitHub secrets (see README), never this one.
         debug {
             storeFile file('openplayer-debug.keystore')
             storePassword 'openplayer'
             keyAlias 'openplayer'
             keyPassword 'openplayer'
         }
-        // Google Play "upload key". Only used when the CI secrets are set (see README).
-        upload {
-            def ks = System.getenv("UPLOAD_KEYSTORE")
+        release {
+            def ks = System.getenv("SIGNING_KEYSTORE")
             if (ks) {
                 storeFile file(ks)
-                storePassword System.getenv("UPLOAD_KEYSTORE_PASSWORD")
-                keyAlias System.getenv("UPLOAD_KEY_ALIAS")
-                keyPassword System.getenv("UPLOAD_KEY_PASSWORD")
+                storePassword System.getenv("SIGNING_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword System.getenv("SIGNING_KEY_PASSWORD")
             }
         }
     }
@@ -52,7 +55,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            if (System.getenv("UPLOAD_KEYSTORE")) signingConfig signingConfigs.upload
+            signingConfig System.getenv("SIGNING_KEYSTORE") ? signingConfigs.release : signingConfigs.debug
         }
     }
 }
@@ -68,6 +71,10 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.activity:activity:$androidxActivityVersion"
     implementation "androidx.core:core:$androidxCoreVersion"
+    // Second playback engine: Media3 (Apache-2.0) + NextLib FFmpeg decoders (GPL-3)
+    implementation "androidx.media3:media3-exoplayer:1.11.1"
+    implementation "androidx.media3:media3-ui:1.11.1"
+    implementation "io.github.anilbeesetti:nextlib-media3ext:1.11.1-0.18.0"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')

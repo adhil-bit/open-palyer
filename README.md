@@ -2,6 +2,7 @@
 
 An ad-free video and music player for your phone — as an **Android app** (recommended) or a web app.
 **No ads. No tracking. Nothing uploaded** — your videos are played straight from your device.
+Free and open source under the [GPL-3.0](LICENSE).
 
 ## How Open Player compares
 
@@ -11,6 +12,7 @@ All of these are good players, and VLC and Next Player are ad-free too. What Ope
 - **Proves it's genuine.** Every download comes with its SHA-256 checksum, signing-certificate fingerprint and VirusTotal result, and the app's **Verify app** screen shows its own fingerprint to compare.
 - **Made for Telegram downloads.** A built-in guide for videos other players can't find, "Open with" from Telegram, and an optional hidden-folder search.
 - **MX-style comfort, zero tracking.** A private PIN folder, play queue, playlists and familiar gestures, without ads, ad networks or analytics.
+- **Built for families and full phones.** Kids mode (chosen folders, daily time limit, PIN to leave), a storage cleaner for duplicate and already-watched videos, night audio mode, and watch history that follows a file when you move or rename it.
 
 | | **Open Player** | MX Player (free) | VLC | Next Player |
 |---|---|---|---|---|
@@ -22,10 +24,15 @@ All of these are good players, and VLC and Next Player are ad-free too. What Ope
 | Help with Telegram downloads | ✅ Guide, Open with, hidden-folder search | ◐ Open with | ◐ Open with | ◐ Open with |
 | Gestures, PiP, speed, screen lock | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
 | Cache you can see & clear | ✅ Storage meter, one-tap refresh | ◐ Android settings | ◐ Android settings | ◐ Android settings |
-| Format support | ◐ Common formats: MP4, WebM, most MKV, MP3, AAC, FLAC | ✅ Very wide | ✅ Widest | ✅ Wide (incl. AC3, DTS, TrueHD audio) |
-| Embedded subtitles & audio-language choice | ❌ Not yet (external .srt / .vtt only) | ✅ Yes | ✅ Yes | ✅ Yes |
+| Format support | ✅ Wide in the Android app: MKV, AVI, FLV, TS, MPEG and more, incl. AC3, DTS, TrueHD audio (FFmpeg). ◐ Web app: what the browser plays | ✅ Very wide | ✅ Widest | ✅ Wide (incl. AC3, DTS, TrueHD audio) |
+| Embedded subtitles & audio-language choice | ✅ Android app: pick audio language and built-in subtitles (SRT, ASS, PGS). Web app: .srt / .vtt files | ✅ Yes | ✅ Yes | ✅ Yes |
+| Kids mode (chosen folders, daily time limit, PIN to leave) | ✅ Yes | ◐ Kids lock (locks the screen) | ❌ No | ❌ No |
+| Storage cleaner (duplicates, watched videos) | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| Night audio mode | ✅ Yes | ❌ No | ◐ Compressor filter on desktop | ❌ No |
+| Resume survives moving or renaming a file | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| Open source | ✅ GPL-3.0 | ❌ No | ✅ GPL / LGPL | ✅ GPL-3.0 |
 
-**When another player is better:** for unusual formats (AVI, WMV, FLV), films with AC3/DTS surround sound, or switching between subtitle tracks and audio languages inside an MKV, VLC or Next Player handle more today. VLC also plays from home network shares and casts to TVs.
+**When another player is better:** VLC plays from home network shares (SMB, DLNA) and casts to TVs, and it still handles the oddest old formats (WMV, RealMedia). In the web app on iPhone or PC, formats are limited to what the browser can play.
 
 <sub>Android versions, from public information as of November 2026: MX Player's ad networks and trackers as listed by [AppGoblin](https://www.appgoblin.info/apps/com.mxtech.videoplayer.ad); Next Player's features from its [F-Droid page](https://f-droid.org/packages/dev.anilbeesetti.nextplayer/). VLC, MX Player and Next Player are trademarks of their respective owners; Open Player isn't affiliated with them.</sub>
 
@@ -58,6 +65,17 @@ All of these are good players, and VLC and Next Player are ad-free too. What Ope
 - **A-B repeat**, **jump to time**, **bookmarks** (shown as marks on the seek bar)
 - **Equalizer** with 12 presets and 10 adjustable bands
 - **Audio delay** (saved per video) to fix out-of-sync sound
+- **Night mode** — softens explosions and lifts quiet dialogue, for late-night watching
+
+**All formats (Android app)**
+- A second, built-in engine (Media3 + FFmpeg) plays MKV, AVI, FLV, TS, M2TS, MPEG and VOB files, with AC3, E-AC3, DTS, TrueHD and other surround sound
+- **Audio track** picker for films with several languages; **built-in subtitles** (SRT, ASS, PGS, VobSub) in the CC menu
+- **Auto** picks the engine per file and switches by itself if a file won't play or has no sound; change it in Settings → Player engine or per video in ⋮ → Player engine
+
+**Family & housekeeping**
+- **Kids mode** — children see only the folders you choose, with an optional daily time limit; no deleting or settings, and your PIN is needed to leave
+- **Clean up storage** (Android app) — finds duplicate copies, big videos you've already watched and your largest files, and deletes the ones you tick with one confirmation
+- **Resume after moves** — move or rename a video and it still remembers where you stopped
 - **Video adjustments**: brightness, contrast, saturation, hue, mirror
 - **Video details**: resolution, frame rate, bitrate, dropped frames
 - Screen recordings (WebM files with no stored length) play with a working seek bar
@@ -128,7 +146,7 @@ Installed apps will show "A new version is ready — Reload". Users can also for
 
 ## Limits of a web player
 
-- Formats depend on the browser's decoders: MP4 (H.264/AAC) and WebM play everywhere; many MKV files work; AC3/DTS audio and some older codecs don't.
+- Formats depend on the browser's decoders: MP4 (H.264/AAC) and WebM play everywhere; many MKV files work; AC3/DTS audio and some older codecs don't. The Android app adds its own FFmpeg engine for these.
 - A web app can't scan the whole phone on its own — you pick files or folders, and Open Player remembers your progress for each one.
 - The Recent list keeps your watch position, but a file has to be picked again after the app is closed (browser security rule).
 
@@ -143,7 +161,7 @@ Installed apps will show "A new version is ready — Reload". Users can also for
 | `app/sw.js` | Offline cache, updates, share target |
 | `app/manifest.webmanifest` | Install info, share target, file handling |
 | `sw.js` (root) | Retires the old service worker from before the player moved to `app/` |
-| `android/` | Android app (Capacitor); native media code in `MediaLibraryPlugin.java` |
+| `android/` | Android app (Capacitor); media library in `MediaLibraryPlugin.java`, all-formats engine in `NativePlayerPlugin.java` |
 | `scripts/build-www.mjs` | Copies the web app into the Android build |
 | `.github/workflows/android.yml` | Builds the APK and publishes it to Releases |
 
@@ -171,7 +189,23 @@ Users can compare the fingerprint with **Settings → About → Verify app** ins
 
 ### Signing key
 
-The APK is signed with `android/app/openplayer-debug.keystore`, which is in this repo so that every build installs over the previous one. **Before the repo becomes public, replace it with a private key kept in GitHub Secrets**, or anyone could sign a fake update. Changing the key changes the fingerprint, and people then have to uninstall once before installing the new version.
+Releases are signed with a private key stored in GitHub Secrets. Create it once and keep a backup somewhere safe: **every future update must be signed with the same key**, or phones refuse to install it over the old version.
+
+```bash
+keytool -genkeypair -v -keystore openplayer-release.jks -alias openplayer -keyalg RSA -keysize 4096 -validity 10000
+base64 -w0 openplayer-release.jks > release.b64      # Mac: base64 -i openplayer-release.jks -o release.b64
+```
+
+Add these repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `SIGNING_KEYSTORE_BASE64` | contents of `release.b64` |
+| `SIGNING_KEYSTORE_PASSWORD` | the keystore password |
+| `SIGNING_KEY_ALIAS` | `openplayer` |
+| `SIGNING_KEY_PASSWORD` | the key password (same as the keystore password unless you chose a different one) |
+
+Never commit the `.jks` file. Without these secrets the workflow still builds, but signs with the public test key in `android/app/openplayer-debug.keystore` and marks the release as a test build. That test key is public, so **add the private key before making the repo public or sharing downloads**. Switching keys changes the fingerprint, and people who installed a test build have to uninstall it once.
 
 ## Google Play edition
 
@@ -183,14 +217,7 @@ The app has two editions (Gradle flavors):
 | Everything else | Yes | Yes |
 | Built as | `OpenPlayer-x.y.z.apk` | `OpenPlayer-x.y.z-play.aab` (upload to Play Console) |
 
-To get the `.aab` from the workflow, create a Play **upload key** once and add it as secrets:
-
-```bash
-keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
-base64 -w0 upload.jks > upload.jks.b64      # Mac: base64 -i upload.jks -o upload.jks.b64
-```
-
-Add these repository secrets: `UPLOAD_KEYSTORE_BASE64` (contents of `upload.jks.b64`), `UPLOAD_KEYSTORE_PASSWORD`, `UPLOAD_KEY_ALIAS` (`upload`), `UPLOAD_KEY_PASSWORD`. Keep `upload.jks` somewhere safe and **don't commit it**. With Play App Signing, Google keeps the real app-signing key, and a lost upload key can be reset through Play support.
+The workflow builds the `.aab` whenever the signing secrets above are set; it's signed with the same key, which Play Console accepts as the upload key. With Play App Signing, Google keeps the app-signing key, and a lost upload key can be reset through Play support.
 
 In Play Console you'll also need:
 - **Testing:** new personal developer accounts must run a closed test with 12 testers for 14 days before production.
@@ -199,3 +226,7 @@ In Play Console you'll also need:
 - **Privacy policy URL:** the landing page's `#privacy` section.
 
 The Play edition uses the same app ID as the APK, but Google re-signs it. Someone who installed the direct APK has to uninstall it before installing from Play.
+
+## License
+
+Open Player is free software under the [GNU General Public License v3.0](LICENSE). The Android app's all-formats engine uses [Media3](https://github.com/androidx/media) (Apache-2.0) and FFmpeg through [NextLib](https://github.com/anilbeesetti/nextlib) (GPL-3.0).
