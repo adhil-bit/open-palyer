@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.7.3';
+const APP_VERSION = '1.7.4';
 // The website's download section: the APK link there comes with its checksum and signing fingerprint.
 const ANDROID_APK_URL = new URL('../#download', location.href).href;
 const VERIFY_URL = new URL('../#verify', location.href).href;
@@ -43,6 +43,7 @@ const DEFAULTS = {
   shuffle: false,
   hpPause: true,         // Android app: pause when headphones disconnect
   hpResume: true,        // …and resume when they reconnect
+  autoFull: null,        // full screen when a video starts; null = phones yes, computers no
   engine: 'auto',        // Android app: auto | web (standard) | native (all formats)
   night: false,          // night audio mode
 };
@@ -658,6 +659,7 @@ async function sheetSettings() {
     <div class="group">Playback</div>
     ${opt('resume', 'i-loop', 'Resume where you left off', `<span class="val">${resumeLbl[S.resume]}</span>`)}
     ${opt('autoNext', 'i-next', 'Auto-play next video', sw(S.autoNext))}
+    ${opt('autoFull', 'i-aspect', 'Full screen when a video starts<small>Off: plays in the window; use the full-screen button or press F</small>', sw(wantAutoFull()))}
     ${seg('seekStep', 'i-fwd', 'Skip amount', 'Double-tap and skip buttons', [[5, '5s'], [10, '10s'], [15, '15s'], [30, '30s']])}
     ${seg('gestureSens', 'i-hand', 'Gesture sensitivity', 'Swipes for seek, volume and brightness', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']])}
     ${seg('autoHide', 'i-timer', 'Hide controls after', 'While a video is playing', [[2, '2s'], [3.5, '3.5s'], [5, '5s'], [8, '8s'], [0, 'Never']])}
@@ -704,6 +706,7 @@ async function sheetSettings() {
     if (o === 'privacy') { closeSheet(); return sheetPrivacy(); }
     if (o === 'resume') S.resume = { always: 'ask', ask: 'never', never: 'always' }[S.resume];
     if (o === 'autoNext') S.autoNext = !S.autoNext;
+    if (o === 'autoFull') S.autoFull = !wantAutoFull();
     if (o === 'keepAwake') S.keepAwake = !S.keepAwake;
     if (o === 'rememberBright') S.rememberBright = !S.rememberBright;
     if (o === 'refreshCache') { closeSheet(); return refreshAppCache(); }
@@ -929,11 +932,21 @@ function openPlayer(item, queue) {
   P.el.hidden = false;
   document.documentElement.style.background = '#000';
   hideMini();
-  if (item.kind !== 'audio') enterFullscreen();
+  if (item.kind !== 'audio' && wantAutoFull()) enterFullscreen();
   if (!history.state?.player) history.pushState({ player: 1 }, '');
   load(item);
   showControls();
 }
+const IS_PHONE = NATIVE || (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 820);
+const wantAutoFull = () => S.autoFull ?? IS_PHONE;
+function isFull() { return !!document.fullscreenElement; }
+function toggleFull() {
+  if (isFull()) document.exitFullscreen().catch(() => {});
+  else document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {});
+}
+function syncFullBtn() { $('#btnFull use').setAttribute('href', isFull() ? '#i-unfull' : '#i-full'); $('#btnFull').setAttribute('aria-label', isFull() ? 'Exit full screen' : 'Full screen'); }
+document.addEventListener('fullscreenchange', syncFullBtn);
+if (!NATIVE) { $('#btnFull').hidden = false; $('#btnFull').onclick = toggleFull; }
 function enterFullscreen() {
   if (NATIVE) { ML.setImmersive({ on: true }).catch(() => {}); return; }
   try { document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {}); } catch {}
@@ -1316,14 +1329,14 @@ function autoOrient(force) {
     ML.setOrientation({ orientation: want }).catch(() => {});
     return;
   }
-  const o = screen.orientation; if (!o?.lock) return;
+  const o = screen.orientation; if (!o?.lock || !IS_PHONE) return;
   if (want === 'auto') {
     if (!force && !P.v.videoWidth) return;
     want = P.v.videoWidth >= P.v.videoHeight ? 'landscape' : 'portrait';
   }
   const go = () => o.lock(want).catch(() => {});
   if (document.fullscreenElement) go();
-  else document.documentElement.requestFullscreen?.().then(go).catch(() => {});
+  else if (force || wantAutoFull()) document.documentElement.requestFullscreen?.().then(go).catch(() => {});
 }
 
 /* --- brightness / volume --- */
@@ -1554,6 +1567,7 @@ document.addEventListener('keydown', e => {
   else if (k === 'ArrowRight' || k === 'l') { seekBy(S.seekStep); ripple('R'); }
   else if (k === 'ArrowUp') { setVolume(P.vol + 0.1); hud('i-vol', P.vol / 2, Math.round(P.vol * 100) + '%'); e.preventDefault(); }
   else if (k === 'ArrowDown') { setVolume(P.vol - 0.1); hud('i-vol', P.vol / 2, Math.round(P.vol * 100) + '%'); e.preventDefault(); }
+  else if (k === 'f' && !NATIVE) toggleFull();
   else if (k === 'n') next();
   else if (k === 'p') prev();
   else if (k === 'Escape' && !document.fullscreenElement) closePlayer();
