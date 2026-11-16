@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const ANDROID_APK_URL = 'https://github.com/adhil-bit/open-palyer/releases/latest';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -30,8 +30,14 @@ const DEFAULTS = {
   subSize: 20,
   subBg: false,
   subPos: 9,
-  sort: 'name',          // name | date | size | duration
+  sort: 'name',          // name | date | size | duration  (old; per-list sorts live in S.sorts)
   sortDir: 1,
+  gestureSens: 'normal', // slow | normal | fast
+  autoHide: 3.5,         // seconds before controls hide; 0 = never
+  framePreview: true,
+  shuffle: false,
+  hpPause: true,         // Android app: pause when headphones disconnect
+  hpResume: true,        // …and resume when they reconnect
 };
 const store = {
   get(k, d) { try { const v = localStorage.getItem('op.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -235,28 +241,27 @@ function makeThumb(file) {
 /* ---------------- library rendering ---------------- */
 const listEl = $('#list');
 const isAudio = i => i.kind === 'audio';
-const videoItems = () => lib.items.filter(i => !isAudio(i));
-const audioItems = () => lib.items.filter(isAudio);
+const videoItems = () => lib.items.filter(i => !isAudio(i) && !privateIds.has(i.id));
+const audioItems = () => lib.items.filter(i => isAudio(i) && !privateIds.has(i.id));
 lib.musicView = 'songs';   // songs | albums | artists
 lib.group = null;          // selected album/artist
 
-function sortItems(arr) {
-  const key = { name: i => (i.title || i.name).toLowerCase(), date: i => i.mtime, size: i => i.size, duration: i => i.dur || 0 }[S.sort];
-  return [...arr].sort((a, b) => {
-    const x = key(a), y = key(b);
-    return (x < y ? -1 : x > y ? 1 : 0) * S.sortDir || a.name.localeCompare(b.name, undefined, { numeric: true });
-  });
-}
+function sortItems(arr, ctx = sortCtx()) { return sortBy(arr, ctx === 'songs' ? 'songs' : 'videos'); }
 function matchQuery(i) {
   if (!lib.query) return true;
   const q = lib.query.toLowerCase();
   return [i.name, i.title, i.artist, i.album].some(s => s && s.toLowerCase().includes(q));
 }
 function visibleItems() {
+  if (lib.tab === 'playlists') {
+    const pl = lib.playlist && plById(lib.playlist);
+    return pl ? plPlayable(pl).filter(matchQuery) : [];
+  }
+  if (lib.tab === 'folders' && lib.folder === PRIV) return privUnlocked ? sortBy(privateItems().filter(matchQuery), 'videos') : [];
   if (lib.tab === 'music') {
     let arr = audioItems().filter(matchQuery);
     if (lib.group) arr = arr.filter(i => (lib.musicView === 'albums' ? i.album : i.artist) === lib.group);
-    return lib.group && lib.musicView === 'albums' ? arr : sortItems(arr);
+    return sortItems(arr, 'songs');
   }
   let arr = videoItems().filter(matchQuery);
   if (lib.tab === 'folders' && lib.folder) arr = arr.filter(i => i.folder === lib.folder);
@@ -298,19 +303,22 @@ function updateRow(it) {
 const emptyMsg = t => `<div class="empty" style="position:static;padding:60px 24px"><p>${t}</p></div>`;
 function render() {
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === lib.tab));
-  const showCrumb = (lib.tab === 'folders' && lib.folder) || (lib.tab === 'music' && lib.group);
+  const showCrumb = (lib.tab === 'folders' && lib.folder) || (lib.tab === 'music' && lib.group) || (lib.tab === 'playlists' && lib.playlist);
   $('#crumb').hidden = !showCrumb;
-  if (showCrumb) $('#crumbTitle').textContent = lib.tab === 'music' ? lib.group : lib.folder;
+  if (showCrumb) $('#crumbTitle').textContent = lib.tab === 'music' ? lib.group
+    : lib.tab === 'playlists' ? (plById(lib.playlist)?.name || '')
+    : lib.folder === PRIV ? 'Private' : lib.folder;
   $('#musicChips').hidden = lib.tab !== 'music' || !!lib.group;
   $$('#musicChips button').forEach(b => b.classList.toggle('sel', b.dataset.mv === lib.musicView));
 
   let html = '';
   $('#empty').hidden = true;
   if (lib.tab === 'recent') {
-    const list = recents.filter(r => !lib.query || r.name.toLowerCase().includes(lib.query.toLowerCase()));
+    const list = sortBy(recents
+      .filter(r => !privateIds.has(r.id) && (!lib.query || r.name.toLowerCase().includes(lib.query.toLowerCase())))
+      .map(r => { const it = lib.byId.get(r.id); return { r, it, name: it?.name || r.name, title: it?.title, mtime: it?.mtime || 0, size: it?.size || r.size || 0, dur: it?.dur || progress[r.id]?.d || 0, played: r.ts }; }), 'recent');
     if (!list.length) html = emptyMsg('Videos and songs you play show up here.');
-    for (const r of list) {
-      const it = lib.byId.get(r.id);
+    for (const { r, it } of list) {
       if (it) { html += rowHTML(it); continue; }
       const p = progress[r.id]; const pct = p && p.d ? clamp(p.t / p.d * 100, 0, 100) : 0;
       html += `<button class="row missing" data-recent="${esc(r.id)}">
@@ -335,11 +343,12 @@ function render() {
       const key = lib.musicView === 'albums' ? 'album' : 'artist';
       const groups = new Map();
       for (const s of songs) {
-        const g = groups.get(s[key]) || { n: 0, art: null, artist: s.artist };
+        const g = groups.get(s[key]) || { name: s[key], n: 0, art: null, artist: s.artist };
         g.n++; if (!g.art && s.thumb) g.art = s.thumb;
         groups.set(s[key], g);
       }
-      for (const [name, g] of [...groups].sort((a, b) => String(a[0]).localeCompare(String(b[0])))) {
+      for (const g of sortBy([...groups.values()], 'groups')) {
+        const name = g.name;
         html += `<button class="row" data-group="${esc(name)}">
           <div class="art${key === 'artist' ? ' round' : ''}${g.art ? '' : ' ph'}">${g.art ? `<img src="${g.art}" alt="" loading="lazy">` : `<svg><use href="#${key === 'album' ? 'i-disc' : 'i-user'}"/></svg>`}</div>
           <div class="meta"><div class="name">${esc(name)}</div><div class="sub"><span>${key === 'album' ? esc(g.artist || '') + ' · ' : ''}${g.n} song${g.n > 1 ? 's' : ''}</span></div></div>
@@ -353,16 +362,31 @@ function render() {
     return;
   }
 
+  if (lib.tab === 'playlists') { listEl.innerHTML = renderPlaylists(); return; }
+  if (lib.tab === 'folders' && lib.folder === PRIV) {
+    if (!privUnlocked) { lib.folder = null; return render(); }
+    const items = visibleItems();
+    listEl.innerHTML = `<div class="privnote"><svg><use href="#i-lock"/></svg>Only you can see these, and they lock again when you leave.</div>` +
+      (items.map(rowHTML).join('') || emptyMsg('Nothing here yet. Long-press any video or song and choose “Move to Private”.'));
+    return;
+  }
   const vids = videoItems();
-  if (!vids.length) { $('#empty').hidden = false; listEl.innerHTML = ''; return; }
+  const showPriv = lib.tab === 'folders' && !lib.folder && !lib.query && (pinRec || privateIds.size);
+  if (!vids.length && !showPriv) { $('#empty').hidden = false; listEl.innerHTML = ''; return; }
   if (lib.tab === 'folders' && !lib.folder && !lib.query) {
+    if (showPriv) html += `<button class="row" data-private="1">
+        <div class="folder-ico priv"><svg><use href="#i-lock"/></svg></div>
+        <div class="meta"><div class="name">Private</div><div class="sub"><span>${privUnlocked ? plural(privateItems().length, 'file') : 'Locked with PIN'}</span></div></div>
+        <svg class="chev"><use href="#i-chev"/></svg></button>`;
     const groups = new Map();
     for (const it of vids) {
-      const g = groups.get(it.folder) || { n: 0, size: 0, fresh: 0, hidden: 0 };
-      g.n++; g.size += it.size || 0; if (!progress[it.id]) g.fresh++; if (it.hidden) g.hidden++;
+      const g = groups.get(it.folder) || { name: it.folder, n: 0, size: 0, fresh: 0, hidden: 0, mtime: 0, dur: 0 };
+      g.n++; g.size += it.size || 0; g.dur += it.dur || 0; g.mtime = Math.max(g.mtime, it.mtime || 0);
+      if (!progress[it.id]) g.fresh++; if (it.hidden) g.hidden++;
       groups.set(it.folder, g);
     }
-    for (const [name, g] of [...groups].sort((a, b) => a[0].localeCompare(b[0]))) {
+    for (const g of sortBy([...groups.values()], 'folders')) {
+      const name = g.name;
       html += `<button class="row" data-folder="${esc(name)}">
         <div class="folder-ico"><svg><use href="#i-folder"/></svg></div>
         <div class="meta"><div class="name">${esc(name)}</div>
@@ -375,23 +399,75 @@ function render() {
   }
   listEl.innerHTML = html;
 }
+function renderPlaylists() {
+  const pl = lib.playlist && plById(lib.playlist);
+  if (lib.playlist && !pl) lib.playlist = null;
+  if (!pl) {
+    const q = lib.query.toLowerCase();
+    const rows = sortBy(playlists.filter(p => !q || p.name.toLowerCase().includes(q))
+      .map(p => ({ pl: p, name: p.name, n: p.items.length, mtime: p.ts })), 'plists');
+    let html = `<button class="playall ghost" data-act="newpl"><svg><use href="#i-plus"/></svg>New playlist</button>`;
+    if (!playlists.length) return html + emptyMsg('No playlists yet. Long-press any video or song and choose “Add to playlist”, or save your play queue.');
+    for (const { pl: p } of rows) {
+      const items = plPlayable(p);
+      const art = items.find(i => i.thumb)?.thumb;
+      const total = items.reduce((a, i) => a + (i.dur || 0), 0);
+      html += `<button class="row" data-plist="${esc(p.id)}">
+        <div class="art${art ? '' : ' ph'}">${art ? `<img src="${art}" alt="" loading="lazy">` : '<svg><use href="#i-plist"/></svg>'}</div>
+        <div class="meta"><div class="name">${esc(p.name)}</div><div class="sub"><span>${plural(p.items.length, 'item')}</span>${total ? `<span>${fmtTime(total)}</span>` : ''}</div></div>
+        <svg class="chev"><use href="#i-chev"/></svg></button>`;
+    }
+    return html;
+  }
+  const ents = playlistOrder(pl).filter(x => !lib.query || matchQuery(x.it || { name: x.e.name }));
+  const n = ents.filter(x => x.it).length;
+  let html = n ? `<div class="plbar"><button class="playall" data-act="plplay"><svg><use href="#i-play"/></svg>Play all · ${n}</button><button class="playall ghost" data-act="plshuffle"><svg><use href="#i-shuffle"/></svg>Shuffle</button></div>` : '';
+  if (!ents.length) return emptyMsg('This playlist is empty. Long-press any video or song and choose “Add to playlist”.');
+  for (const x of ents) {
+    html += x.it ? rowHTML(x.it) : `<button class="row missing" data-plmiss="${x.i}">
+      <div class="thumb ph"><svg><use href="#i-${x.e.kind === 'audio' ? 'note' : 'film'}"/></svg></div>
+      <div class="meta"><div class="name">${esc(x.e.name)}</div><div class="sub"><span>Not on this device right now · tap to remove</span></div></div></button>`;
+  }
+  return html;
+}
 
 /* long-press on a row → info sheet */
-let rowPress = null;
+let rowPress = null, pressFiredAt = 0;
 listEl.addEventListener('pointerdown', e => {
-  const row = e.target.closest('.row[data-id]'); if (!row) return;
-  rowPress = setTimeout(() => { rowPress = 'fired'; navigator.vibrate?.(15); showInfo(lib.byId.get(row.dataset.id)); }, 520);
+  const row = e.target.closest('.row[data-id], .row[data-plist]'); if (!row) return;
+  clearTimeout(rowPress);
+  rowPress = setTimeout(() => {
+    rowPress = null; pressFiredAt = Date.now(); navigator.vibrate?.(15);
+    if (row.dataset.plist) { const pl = plById(row.dataset.plist); if (pl) sheetPlaylistMenu(pl); }
+    else sheetItemMenu(lib.byId.get(row.dataset.id));
+  }, 520);
 });
-['pointerup', 'pointercancel', 'pointerleave'].forEach(t => listEl.addEventListener(t, () => { if (rowPress !== 'fired') clearTimeout(rowPress); }));
-listEl.addEventListener('scroll', () => { if (rowPress !== 'fired') clearTimeout(rowPress); }, { passive: true });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => listEl.addEventListener(t, () => clearTimeout(rowPress)));
+listEl.addEventListener('scroll', () => clearTimeout(rowPress), { passive: true });
 listEl.addEventListener('contextmenu', e => e.preventDefault());
 listEl.addEventListener('click', e => {
-  if (rowPress === 'fired') { rowPress = null; return; }
+  if (Date.now() - pressFiredAt < 700) return;   // the release that ended a long-press isn't a tap
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (act === 'grant') return requestMediaAccess();
   if (act === 'addMusic') return $('#pickMusic').click();
-  if (act === 'playall') { const q = visibleItems(); if (q.length) openPlayer(q[0], q); return; }
+  if (act === 'playall') { const q = visibleItems(); if (q.length) openPlayer(S.shuffle ? q[Math.floor(Math.random() * q.length)] : q[0], q); return; }
+  if (act === 'newpl') {
+    askText('New playlist', '', { placeholder: 'Playlist name', ok: 'Create' }).then(name => {
+      if (!name) return;
+      const pl = createPlaylist(name); lib.playlist = pl.id; render();
+      snack('Playlist created. Long-press any video or song → Add to playlist', null, null, 5000);
+    });
+    return;
+  }
+  if (act === 'plplay' || act === 'plshuffle') { const pl = plById(lib.playlist); if (pl) playPlaylist(pl, act === 'plshuffle'); return; }
   const row = e.target.closest('.row'); if (!row) return;
+  if (row.dataset.private) return openPrivate();
+  if (row.dataset.plist) { lib.playlist = row.dataset.plist; render(); listEl.scrollTop = 0; hydrateThumbs(); return; }
+  if (row.dataset.plmiss != null) {
+    const pl = plById(lib.playlist); if (!pl) return;
+    const i = +row.dataset.plmiss, [gone] = pl.items.splice(i, 1); savePlaylists(); render();
+    return snack('Removed from playlist', 'Undo', () => { pl.items.splice(i, 0, gone); savePlaylists(); render(); });
+  }
   if (row.dataset.folder) { lib.folder = row.dataset.folder; render(); listEl.scrollTop = 0; return; }
   if (row.dataset.group) { lib.group = row.dataset.group; render(); listEl.scrollTop = 0; return; }
   if (row.dataset.recent) {
@@ -403,14 +479,17 @@ listEl.addEventListener('click', e => {
 });
 function visibleQueueFor(it) {
   if (lib.tab === 'recent') return recents.map(r => lib.byId.get(r.id)).filter(i => i && i.kind === it.kind);
-  if (lib.tab === 'folders') return lib.folder ? visibleItems() : videoItems().filter(i => i.folder === it.folder);
+  if (lib.tab === 'folders') return lib.folder ? visibleItems() : sortBy(videoItems().filter(i => i.folder === it.folder), 'videos');
   return visibleItems();
 }
 $$('#musicChips button').forEach(b => b.onclick = () => { lib.musicView = b.dataset.mv; lib.group = null; render(); listEl.scrollTop = 0; });
 
 /* tabs, search, sort, pickers */
-$$('.tab').forEach(t => t.onclick = () => { lib.tab = t.dataset.tab; lib.folder = null; lib.group = null; render(); listEl.scrollTop = 0; hydrateThumbs(); });
-$('#btnCrumbBack').onclick = () => { lib.folder = null; lib.group = null; render(); };
+$$('.tab').forEach(t => t.onclick = () => {
+  if (lib.folder === PRIV) privUnlocked = false;
+  lib.tab = t.dataset.tab; lib.folder = null; lib.group = null; lib.playlist = null; render(); listEl.scrollTop = 0; hydrateThumbs();
+});
+$('#btnCrumbBack').onclick = () => { if (lib.folder === PRIV) privUnlocked = false; lib.folder = null; lib.group = null; lib.playlist = null; render(); };
 $('#btnSearch').onclick = () => { $('#searchbar').hidden = false; $('#searchInput').focus(); };
 $('#btnSearchClose').onclick = () => { $('#searchbar').hidden = true; $('#searchInput').value = ''; lib.query = ''; render(); };
 $('#searchInput').oninput = e => { lib.query = e.target.value.trim(); render(); };
@@ -430,6 +509,7 @@ function openSheet(title, html, onClose) {
   $('#sheetBody').innerHTML = html;
   sheet.hidden = scrim.hidden = false;
   sheet.scrollTop = 0;
+  $('#snackbar').hidden = true;   // don't cover the panel (e.g. the PIN pad)
   sheetOnClose = onClose || null;
   holdControls(true);
   return $('#sheetBody');
@@ -443,6 +523,11 @@ scrim.onclick = closeSheet;
 const opt = (id, icon, label, val = '', cls = '') =>
   `<button class="opt ${cls}" data-o="${id}"><svg><use href="#${icon}"/></svg><span class="lbl">${label}</span>${val}</button>`;
 const sw = on => `<span class="switch${on ? ' on' : ''}"></span>`;
+/* segmented choice row used in Settings */
+const seg = (key, icon, label, sub, choices) => `<div class="segrow" data-seg="${key}">
+    <div class="seglbl"><svg><use href="#${icon}"/></svg><span>${label}${sub ? `<small>${sub}</small>` : ''}</span></div>
+    <div class="seg">${choices.map(([v, l]) => `<button data-v="${v}" class="${String(S[key]) === String(v) ? 'sel' : ''}">${l}</button>`).join('')}</div>
+  </div>`;
 
 function sheetAdd() {
   const b = openSheet('Add videos',
@@ -477,13 +562,25 @@ function sheetUrl() {
   setTimeout(() => $('#urlIn')?.focus(), 50);
 }
 function sheetSort() {
-  const items = [['name', 'Name'], ['date', 'Date modified'], ['size', 'Size'], ['duration', 'Length']];
-  const draw = () => items.map(([k, l]) => opt(k, S.sort === k ? 'i-check' : 'i-sort', l,
-    S.sort === k ? `<span class="val">${S.sortDir > 0 ? 'Ascending' : 'Descending'}</span>` : '', S.sort === k ? 'sel' : '')).join('');
-  const b = openSheet('Sort by', draw());
+  const ctx = sortCtx();
+  const items = SORT_OPTS[ctx];
+  const dirLbl = (k, d) => (k === 'name' || k === 'artist') ? (d > 0 ? 'A → Z' : 'Z → A')
+    : k === 'custom' ? (d > 0 ? 'First → last' : 'Last → first')
+    : (k === 'date' || k === 'played') ? (d > 0 ? 'Oldest first' : 'Newest first')
+    : (d > 0 ? 'Smallest first' : 'Largest first');
+  const title = ctx === 'groups' ? (lib.musicView === 'albums' ? 'Sort albums' : 'Sort artists') : SORT_TITLES[ctx];
+  const draw = () => {
+    const cur = S.sorts[ctx];
+    return items.map(([k, l]) => opt(k, cur.k === k ? 'i-check' : 'i-sort', l,
+      cur.k === k ? `<span class="val">${dirLbl(k, cur.d)} ⇅</span>` : '', cur.k === k ? 'sel' : '')).join('') +
+      `<p class="sheet-note">Tap the selected option again to reverse the order.</p>`;
+  };
+  const b = openSheet(title, draw());
   b.onclick = e => {
     const k = e.target.closest('[data-o]')?.dataset.o; if (!k) return;
-    if (S.sort === k) S.sortDir *= -1; else { S.sort = k; S.sortDir = k === 'name' ? 1 : -1; }
+    const cur = S.sorts[ctx];
+    if (cur.k === k) cur.d *= -1;
+    else S.sorts[ctx] = { k, d: (k === 'name' || k === 'artist' || k === 'custom') ? 1 : -1 };
     saveSettings(); b.innerHTML = draw(); render();
   };
 }
@@ -512,9 +609,17 @@ async function sheetSettings() {
     <div class="group">Playback</div>
     ${opt('resume', 'i-loop', 'Resume where you left off', `<span class="val">${resumeLbl[S.resume]}</span>`)}
     ${opt('autoNext', 'i-next', 'Auto-play next video', sw(S.autoNext))}
-    ${opt('seekStep', 'i-fwd', 'Double-tap seek', `<span class="val">${S.seekStep}s</span>`)}
+    ${seg('seekStep', 'i-fwd', 'Skip amount', 'Double-tap and skip buttons', [[5, '5s'], [10, '10s'], [15, '15s'], [30, '30s']])}
+    ${seg('gestureSens', 'i-hand', 'Gesture sensitivity', 'Swipes for seek, volume and brightness', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']])}
+    ${seg('autoHide', 'i-timer', 'Hide controls after', 'While a video is playing', [[2, '2s'], [3.5, '3.5s'], [5, '5s'], [8, '8s'], [0, 'Never']])}
+    ${opt('framePreview', 'i-pip', 'Frame preview while seeking<small>Shows the picture at that moment</small>', sw(S.framePreview))}
     ${opt('keepAwake', 'i-sun', 'Keep screen on while playing', sw(S.keepAwake))}
     ${opt('rememberBright', 'i-sun', 'Remember brightness', sw(S.rememberBright))}
+    ${NATIVE ? `<div class="group">Headphones</div>
+    ${opt('hpPause', 'i-headphones', 'Pause when headphones disconnect<small>Wired and Bluetooth</small>', sw(S.hpPause))}
+    ${opt('hpResume', 'i-headphones', 'Resume when they reconnect<small>Within 15 minutes of disconnecting</small>', sw(S.hpResume))}` : ''}
+    <div class="group">Privacy</div>
+    ${opt('privacy', 'i-lock', pinRec ? 'Private folder<small>Open, change PIN or turn off</small>' : 'Private folder<small>Hide videos and songs behind a PIN</small>', `<span class="val">${pinRec ? 'PIN on' : 'Off'}</span>`)}
     <div class="group">Storage &amp; cache</div>
     <div class="storage">App storage used: <b>${fmtSize(info.usage) || '0 B'}</b>${info.quota ? ` of ${fmtSize(info.quota)}` : ''} · ${info.cacheCount} cache${info.cacheCount === 1 ? '' : 's'}
       <div class="bar"><i style="width:${info.quota ? clamp(info.usage / info.quota * 100, 1, 100) : 1}%"></i></div></div>
@@ -524,14 +629,25 @@ async function sheetSettings() {
     <div class="group">About</div>
     ${opt('update', 'i-info', `Open Player ${APP_VERSION}<small>No ads. No tracking. Your videos never leave this device.</small>`, '<span class="val">Check for update</span>')}`;
   const b = openSheet('Settings', draw(await storageInfo()));
-  const redraw = async () => { b.innerHTML = draw(await storageInfo()); };
+  const redraw = async () => { const sc = sheet.scrollTop; b.innerHTML = draw(await storageInfo()); sheet.scrollTop = sc; };
   b.onclick = async e => {
+    const sv = e.target.closest('[data-seg] [data-v]');
+    if (sv) {
+      const key = sv.closest('[data-seg]').dataset.seg, raw = sv.dataset.v;
+      S[key] = isNaN(+raw) ? raw : +raw;
+      saveSettings();
+      if (key === 'seekStep') applySeekStepIcons();
+      return redraw();
+    }
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    if (o === 'framePreview') S.framePreview = !S.framePreview;
+    if (o === 'hpPause') S.hpPause = !S.hpPause;
+    if (o === 'hpResume') S.hpResume = !S.hpResume;
+    if (o === 'privacy') { closeSheet(); return sheetPrivacy(); }
     if (o === 'resume') S.resume = { always: 'ask', ask: 'never', never: 'always' }[S.resume];
     if (o === 'autoNext') S.autoNext = !S.autoNext;
     if (o === 'keepAwake') S.keepAwake = !S.keepAwake;
     if (o === 'rememberBright') S.rememberBright = !S.rememberBright;
-    if (o === 'seekStep') S.seekStep = { 5: 10, 10: 15, 15: 30, 30: 5 }[S.seekStep] || 10;
     if (o === 'refreshCache') { closeSheet(); return refreshAppCache(); }
     if (o === 'clearThumbs') {
       await idb.clear();
@@ -588,24 +704,13 @@ function showInfo(it) {
   const rows = [
     ['File', it.name], ['Folder', it.folder], ['Size', fmtSize(it.size)],
     ['Length', it.dur ? fmtTime(it.dur) : '—'], ['Resolution', it.w ? `${it.w} × ${it.h}` : '—'],
-    ['Type', it.file?.type || '—'], ['Subtitles', it.sub ? it.sub.name : 'None'],
+    ['Type', it.file?.type || it.mime || '—'], ['Subtitles', it.sub ? it.sub.name : 'None'],
+    ...(it.npath ? [['Location', it.npath]] : []),
     ['Watched', p ? `${fmtTime(p.t)} of ${fmtTime(p.d)}` : 'Not yet'],
   ];
   const b = openSheet('Details',
     `<div style="padding:0 20px 8px">${rows.map(([k, v]) =>
-      `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="color:var(--muted);width:90px;flex:none">${k}</span><span style="word-break:break-word">${esc(v)}</span></div>`).join('')}</div>` +
-    opt('play', 'i-play', 'Play') + opt('remove', 'i-trash', 'Remove from list', '', 'danger'));
-  b.onclick = e => {
-    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
-    closeSheet();
-    if (o === 'play') openPlayer(it, visibleQueueFor(it));
-    if (o === 'remove') {
-      lib.items = lib.items.filter(i => i !== it); lib.byId.delete(it.id);
-      if (it.url) URL.revokeObjectURL(it.url);
-      if (lib.folder && !lib.items.some(i => i.folder === lib.folder)) lib.folder = null;
-      render();
-    }
-  };
+      `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="color:var(--muted);width:90px;flex:none">${k}</span><span style="word-break:break-word">${esc(v)}</span></div>`).join('')}</div>`);
 }
 
 /* =================================================================
@@ -654,7 +759,10 @@ function freshVideo() {
 const fmtRate = r => (Math.round(r * 100) / 100).toFixed(r % 0.25 ? 2 : (r % 1 ? 2 : 1)).replace(/0$/, '') + '×';
 
 function openPlayer(item, queue) {
-  P.queue = queue && queue.length ? queue : [item];
+  P.queue = (queue && queue.length ? queue : [item]).slice();
+  if (!P.queue.includes(item)) P.queue.unshift(item);
+  P.origQueue = null;
+  if (S.shuffle && P.queue.length > 1) { P.origQueue = P.queue.slice(); P.queue = [item, ...shuffled(P.queue.filter(x => x !== item))]; }
   P.idx = Math.max(0, P.queue.indexOf(item));
   P.el.hidden = false;
   document.documentElement.style.background = '#000';
@@ -676,8 +784,9 @@ function exitFullscreen() {
 function load(item, startAt) {
   saveProgress(true);
   P.item = item;
-  P.cues = []; P.subDelay = 0; renderSub();
+  P.cues = []; P.subDelay = 0; P.subBuf = null; P.subEnc = null; P.subEncForced = null; renderSub();
   P.zoom = 1;
+  pvReset(); pvHide();
   if (item.remote && P.boost) freshVideo();
   if (item.remote) P.v.src = item.url;
   else if (item.src) P.v.src = item.src;
@@ -685,9 +794,7 @@ function load(item, startAt) {
   setAudioView(item);
   P.v.playbackRate = S.defaultSpeed;
   $('#vTitle').textContent = item.kind === 'audio' ? (item.title || item.name) : item.name;
-  $('#vSub').textContent = P.queue.length > 1 ? `${P.idx + 1} of ${P.queue.length} · ${item.folder}` : (item.folder || '');
-  $('#btnPrev').disabled = P.idx <= 0; $('#btnPrev').style.opacity = P.idx <= 0 ? .35 : 1;
-  $('#btnNext').disabled = P.idx >= P.queue.length - 1; $('#btnNext').style.opacity = P.idx >= P.queue.length - 1 ? .35 : 1;
+  updateQueueUi();
   $('#spinner').hidden = false;
   P.pendingStart = startAt;
   P.ab = { a: null, b: null };
@@ -697,8 +804,7 @@ function load(item, startAt) {
   if (P.rec) stopRecording();
   if (item.sub) loadSubFile(item.sub, true);
   applyBright();
-  setupMediaSession();
-  if (!item.remote) touchRecent(item);
+  if (!item.remote && !privateIds.has(item.id)) touchRecent(item);
   P.v.play().catch(() => {});
 }
 function onMeta() {
@@ -766,6 +872,7 @@ function onPlayState() {
   $('#btnPlay use').setAttribute('href', playing ? '#i-pause' : '#i-play');
   $('#btnPlay').setAttribute('aria-label', playing ? 'Pause' : 'Play');
   if (navigator.mediaSession) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+  if (playing) P.unplugAt = 0;
   updateMini();
   if (P.item?.kind === 'audio' && P.el.hidden) render();
   if (playing) { keepAwake(true); scheduleHide(); } else { keepAwake(false); showControls(true); saveProgress(true); }
@@ -775,7 +882,10 @@ function onEnded() {
   if (P.sleepEnd) { P.sleepEnd = false; ptoast('Sleep timer: stopped'); return; }
   if (P.repeat === 'one') { P.v.currentTime = 0; P.v.play(); return; }
   if (P.idx < P.queue.length - 1 && (S.autoNext || P.repeat === 'all')) return next();
-  if (P.repeat === 'all' && P.queue.length) { P.idx = -1; return next(); }
+  if (P.repeat === 'all' && P.queue.length) {
+    if (S.shuffle && P.queue.length > 2) { const last = P.item; P.queue = shuffled(P.queue); if (P.queue[0] === last) P.queue.push(P.queue.shift()); }
+    P.idx = 0; return load(P.queue[0]);
+  }
   showControls(true);
 }
 function onError() {
@@ -870,7 +980,7 @@ function showControls(stay) {
   if (!stay) scheduleHide(); else clearTimeout(P.ctlTimer);
 }
 function hideControls() { if (P.held) return; P.el.classList.remove('ctl-on'); }
-function scheduleHide() { clearTimeout(P.ctlTimer); if (!P.v.paused) P.ctlTimer = setTimeout(hideControls, 3500); }
+function scheduleHide() { clearTimeout(P.ctlTimer); if (!P.v.paused && S.autoHide > 0) P.ctlTimer = setTimeout(hideControls, S.autoHide * 1000); }
 function holdControls(on) { P.held = Math.max(0, P.held + (on ? 1 : -1)); if (!on && !P.held) scheduleHide(); }
 function toggleControls() { P.el.classList.contains('ctl-on') ? hideControls() : showControls(); }
 P.el.querySelector('.controls').addEventListener('pointerdown', e => { if (e.target.closest('button,.seek')) scheduleHide(); });
@@ -887,19 +997,34 @@ function updateSeek(t = P.v.currentTime) {
 {
   let dragging = false, lastSet = 0;
   const frac = e => { const r = seekEl.getBoundingClientRect(); return clamp((e.clientX - r.left) / r.width, 0, 1); };
+  const showTip = (f, t) => {
+    const tip = $('#seekTip'); tip.hidden = false;
+    $('#seekTipTime').textContent = fmtTime(t);
+    pvShow('tip', t);
+    // keep the bubble on screen near the edges
+    const r = seekEl.getBoundingClientRect(), half = (tip.offsetWidth || 60) / 2;
+    const x = clamp(f * r.width, half - r.left + 4, innerWidth - r.left - half - 4);
+    tip.style.left = x + 'px';
+  };
   const move = e => {
     const d = P.v.duration; if (!d) return;
-    const t = frac(e) * d;
+    const f = frac(e), t = f * d;
     updateSeek(t);
-    const tip = $('#seekTip'); tip.hidden = false; tip.textContent = fmtTime(t); tip.style.left = frac(e) * 100 + '%';
+    showTip(f, t);
     const now = performance.now();
-    if (now - lastSet > 120) { lastSet = now; P.v.currentTime = t; }
+    // With a frame preview the picture is in the bubble, so only move the real video occasionally.
+    if (now - lastSet > (pvEnabled() ? 400 : 120)) { lastSet = now; P.v.currentTime = t; }
   };
+  seekEl.addEventListener('pointermove', e => {
+    if (dragging || e.pointerType !== 'mouse' || !P.v.duration) return;
+    showTip(frac(e), frac(e) * P.v.duration);
+  });
+  seekEl.addEventListener('pointerleave', e => { if (!dragging && e.pointerType === 'mouse') { $('#seekTip').hidden = true; pvHide(); } });
   seekEl.addEventListener('pointerdown', e => { dragging = true; seekEl.setPointerCapture(e.pointerId); seekEl.classList.add('drag'); holdControls(true); move(e); });
   seekEl.addEventListener('pointermove', e => dragging && move(e));
   const end = e => {
     if (!dragging) return; dragging = false;
-    seekEl.classList.remove('drag'); $('#seekTip').hidden = true;
+    seekEl.classList.remove('drag'); $('#seekTip').hidden = true; pvHide();
     if (P.v.duration) P.v.currentTime = frac(e) * P.v.duration;
     holdControls(false);
   };
@@ -1146,18 +1271,20 @@ function ripple(side) {
       else { mode = 'vol'; base = P.v.muted ? 0 : P.vol; }
     }
     if (mode === 'seek' && isFinite(P.v.duration)) {
-      const span = Math.min(P.v.duration, 180);
+      const span = Math.min(P.v.duration, 180) * gestureSens();
       target = clamp(base + dx / W * span, 0, P.v.duration);
       const delta = target - base;
-      const h = $('#seekhud'); h.hidden = false;
-      h.innerHTML = `${fmtTime(target)}<small>${delta >= 0 ? '+' : '−'}${fmtTime(Math.abs(delta))}</small>`;
+      $('#seekhud').hidden = false;
+      $('#seekhudT').textContent = fmtTime(target);
+      $('#seekhudD').textContent = `${delta >= 0 ? '+' : '−'}${fmtTime(Math.abs(delta))}`;
+      pvShow('hud', target);
       updateSeek(target);
     } else if (mode === 'bright') {
-      P.bright = clamp(base - dy / (H * 0.6), 0, 1.5);
+      P.bright = clamp(base - dy / (H * 0.6) * gestureSens(), 0, 1.5);
       applyBright();
       hud('i-sun', P.bright / 1.5, Math.round(P.bright * 100) + '%');
     } else if (mode === 'vol') {
-      setVolume(base - dy / (H * 0.6) * (P.item?.remote ? 1 : 1.4));
+      setVolume(base - dy / (H * 0.6) * (P.item?.remote ? 1 : 1.4) * gestureSens());
       hud(P.vol ? 'i-vol' : 'i-mute', P.vol / (P.item?.remote ? 1 : 2), Math.round(P.vol * 100) + '%');
     }
   });
@@ -1172,7 +1299,7 @@ function ripple(side) {
       return;
     }
     if (mode === 'speed') { endSpeed(); mode = null; return; }
-    if (mode === 'seek') { P.v.currentTime = target; $('#seekhud').hidden = true; mode = null; return; }
+    if (mode === 'seek') { P.v.currentTime = target; $('#seekhud').hidden = true; pvHide(); mode = null; return; }
     if (mode === 'bright') { if (S.rememberBright) { S.brightness = P.bright; saveSettings(); } mode = null; return; }
     if (mode) { mode = null; return; }
     if (e.type === 'pointercancel' || !start) return;
@@ -1236,6 +1363,7 @@ function sheetSubs() {
   const draw = () => `
     ${opt('load', 'i-plus', 'Load subtitle file<small>.srt or .vtt</small>')}
     ${P.cues.length ? opt('toggle', 'i-cc', 'Show subtitles', sw(P.subOn)) : ''}
+    ${P.subBuf ? opt('enc', 'i-text', 'Character encoding<small>Fix strange symbols</small>', `<span class="val">${P.subEncForced ? '' : 'Auto · '}${esc(encLabel(P.subEnc || 'utf-8').replace(/ \(.*/, ''))}</span>`) : ''}
     <div class="group">Sync</div>
     <div class="grid-opts">
       <button data-d="-0.5">−0.5s</button><button data-d="-0.05">−50ms</button>
@@ -1257,6 +1385,7 @@ function sheetSubs() {
     const o = e.target.closest('[data-o]')?.dataset.o;
     if (d) P.subDelay = Math.round((P.subDelay + +d) * 100) / 100;
     if (o === 'load') { closeSheet(); $('#pickSub').click(); return; }
+    if (o === 'enc') { closeSheet(); return sheetSubEncoding(); }
     if (o === 'toggle') P.subOn = !P.subOn;
     if (o === 'reset') P.subDelay = 0;
     if (o === 'bg') { S.subBg = !S.subBg; saveSettings(); applySubStyle(); }
@@ -1283,6 +1412,9 @@ function sheetMore() {
     (local ? opt('eq', 'i-eq', 'Equalizer', `<span class="val">${S.eqOn ? esc(S.eqPreset) : 'Off'}</span>`) : '') +
     (local ? opt('adelay', 'i-vol', 'Audio delay', `<span class="val">${P.audioDelay ? '+' + Math.round(P.audioDelay * 1000) + ' ms' : 'Off'}</span>`) : '') +
     `<div class="group">Playback</div>` +
+    opt('queue', 'i-queue', 'Play queue', `<span class="val">${P.idx + 1} of ${P.queue.length}</span>`) +
+    opt('shuffle', 'i-shuffle', 'Shuffle', sw(S.shuffle)) +
+    opt('playlists', 'i-plist', 'Playlists') +
     opt('repeat', 'i-loop', 'Repeat', `<span class="val">${{ off: 'Off', one: 'This video', all: 'All in list' }[P.repeat]}</span>`) +
     opt('sleep', 'i-moon', 'Sleep timer', `<span class="val">${sleepLbl}</span>`) +
     opt('info', 'i-info', 'Video details'));
@@ -1300,6 +1432,9 @@ function sheetMore() {
     if (o === 'adelay') return sheetAudioDelay();
     if (o === 'sleep') return sheetSleep();
     if (o === 'info') return sheetMediaInfo();
+    if (o === 'queue') return sheetQueue();
+    if (o === 'playlists') return sheetPlaylists();
+    if (o === 'shuffle') { setShuffle(!S.shuffle); return sheetMore(); }
     if (o === 'repeat') { P.repeat = { off: 'one', one: 'all', all: 'off' }[P.repeat]; P.v.loop = false; sheetMore(); }
   };
 }
@@ -1601,11 +1736,10 @@ function parseSubs(text) {
 }
 async function loadSubFile(file, silent) {
   try {
-    const buf = await file.arrayBuffer();
-    let text = new TextDecoder('utf-8').decode(buf);
-    if (text.includes('�')) text = new TextDecoder('windows-1252').decode(buf);
-    P.cues = parseSubs(text); P.subOn = true;
-    if (!silent) ptoast(P.cues.length ? `Subtitles loaded (${P.cues.length} lines)` : 'Couldn’t read that subtitle file');
+    P.subBuf = new Uint8Array(await file.arrayBuffer());
+    P.subEncForced = null;
+    decodeSubs();
+    if (!silent) ptoast(P.cues.length ? `Subtitles loaded · ${P.cues.length} lines · ${encLabel(P.subEnc).replace(/ \(.*/, '')}` : 'Couldn’t read that subtitle file');
     applySubStyle(); renderSub();
   } catch { ptoast('Couldn’t read that subtitle file'); }
 }
@@ -1640,6 +1774,7 @@ async function keepAwake(on) {
   } catch {}
 }
 document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && privUnlocked) lockPrivate();
   if (document.visibilityState === 'visible' && !P.v.paused) keepAwake(true);
   if (document.visibilityState === 'hidden') saveProgress(true);
 });
@@ -1860,6 +1995,721 @@ if (NATIVE) {
   });
 }
 
+/* =================================================================
+   v1.4 — sorting everywhere, private folder, item menu, play queue,
+   shuffle, playlists, frame preview, subtitle encodings, headphones
+   ================================================================= */
+
+/* ---------- small sheet helpers ---------- */
+function confirmSheet(title, text, okLabel = 'OK', danger = false) {
+  return new Promise(resolve => {
+    let done = false;
+    const b = openSheet(title, `<p class="sheet-note">${text}</p>
+      <div class="sheet-actions"><button class="btn" data-a="no">Cancel</button><button class="btn ${danger ? 'danger' : 'primary'}" data-a="yes">${okLabel}</button></div>`,
+      () => { if (!done) { done = true; resolve(false); } });
+    b.onclick = e => {
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      done = true; closeSheet(); resolve(a === 'yes');
+    };
+  });
+}
+function askText(title, value = '', { placeholder = '', ok = 'Save', suffix = '', note = '' } = {}) {
+  return new Promise(resolve => {
+    let done = false;
+    const b = openSheet(title, `<div class="field-wrap">
+        ${note ? `<p class="sheet-note" style="padding:0 0 10px">${note}</p>` : ''}
+        <div class="field-row"><input class="field" id="askIn" value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off" spellcheck="false">${suffix ? `<span class="field-suffix">${esc(suffix)}</span>` : ''}</div>
+        <p class="field-err" id="askErr" hidden></p>
+      </div>
+      <div class="sheet-actions"><button class="btn" data-a="no">Cancel</button><button class="btn primary" data-a="yes">${ok}</button></div>`,
+      () => { if (!done) { done = true; resolve(null); } });
+    const inp = $('#askIn', b);
+    const go = () => {
+      const v = inp.value.trim();
+      if (!v) { inp.focus(); return; }
+      done = true; closeSheet(); resolve(v);
+    };
+    b.onclick = e => {
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      if (a === 'yes') go(); else { done = true; closeSheet(); resolve(null); }
+    };
+    inp.onkeydown = e => { if (e.key === 'Enter') go(); };
+    setTimeout(() => { inp.focus(); inp.select(); }, 60);
+  });
+}
+
+/* ---------- sorting in every list ---------- */
+const SORT_OPTS = {
+  folders: [['name', 'Name'], ['date', 'Newest video'], ['size', 'Total size'], ['count', 'Number of videos']],
+  videos: [['name', 'Name'], ['date', 'Date modified'], ['size', 'Size'], ['duration', 'Length']],
+  recent: [['played', 'Last played'], ['name', 'Name'], ['date', 'Date modified'], ['size', 'Size'], ['duration', 'Length']],
+  songs: [['name', 'Title'], ['artist', 'Artist'], ['date', 'Date added'], ['size', 'Size'], ['duration', 'Length']],
+  groups: [['name', 'Name'], ['count', 'Number of songs']],
+  playlist: [['custom', 'Playlist order'], ['name', 'Name'], ['date', 'Date modified'], ['duration', 'Length']],
+  plists: [['name', 'Name'], ['date', 'Last changed'], ['count', 'Number of items']],
+};
+const SORT_TITLES = { folders: 'Sort folders', videos: 'Sort videos', recent: 'Sort recent', songs: 'Sort songs', groups: 'Sort', playlist: 'Sort playlist', plists: 'Sort playlists' };
+S.sorts = Object.assign({
+  folders: { k: 'name', d: 1 }, videos: { k: S.sort || 'name', d: S.sortDir || 1 }, recent: { k: 'played', d: -1 },
+  songs: { k: 'name', d: 1 }, groups: { k: 'name', d: 1 }, playlist: { k: 'custom', d: 1 }, plists: { k: 'date', d: -1 },
+}, S.sorts || {});
+function sortCtx() {
+  if (lib.tab === 'recent') return 'recent';
+  if (lib.tab === 'playlists') return lib.playlist ? 'playlist' : 'plists';
+  if (lib.tab === 'music') return (lib.musicView !== 'songs' && !lib.group && !lib.query) ? 'groups' : 'songs';
+  if (lib.tab === 'folders' && !lib.folder && !lib.query) return 'folders';
+  return 'videos';
+}
+const nameOf = x => String(x.title || x.name || '');
+const SORT_KEYS = {
+  date: x => x.mtime || 0, size: x => x.size || 0, duration: x => x.dur || 0,
+  count: x => x.n || 0, played: x => x.played || 0, custom: x => x.order || 0,
+};
+const byName = (a, b) => nameOf(a).localeCompare(nameOf(b), undefined, { numeric: true, sensitivity: 'base' });
+function sortBy(arr, ctx) {
+  const { k, d } = S.sorts[ctx] || { k: 'name', d: 1 };
+  if (k === 'name') return [...arr].sort((a, b) => byName(a, b) * d);
+  if (k === 'artist') return [...arr].sort((a, b) => (String(a.artist || '').localeCompare(String(b.artist || ''), undefined, { sensitivity: 'base' }) * d) || byName(a, b));
+  const key = SORT_KEYS[k] || SORT_KEYS.date;
+  return [...arr].sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * d || byName(a, b); });
+}
+
+/* ---------- private folder (PIN) ---------- */
+const PRIV = '\u0000private';
+let privateIds = new Set(store.get('privateIds', []));
+let pinRec = store.get('pin', null);                 // { salt, hash }
+let privUnlocked = false, pinFails = 0, pinLockUntil = 0;
+const savePrivate = () => store.set('privateIds', [...privateIds]);
+const privateItems = () => lib.items.filter(i => privateIds.has(i.id));
+async function hashPin(pin, salt) {
+  try {
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + ':' + pin));
+    return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    let h = 2166136261; for (const c of salt + ':' + pin) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    return 'f' + (h >>> 0).toString(16);
+  }
+}
+function askPin(title, sub) {
+  return new Promise(resolve => {
+    let pin = '', done = false;
+    const dots = () => [0, 1, 2, 3].map(i => `<i class="${i < pin.length ? 'on' : ''}"></i>`).join('');
+    const b = openSheet(title, `<p class="pin-sub">${sub}</p><div class="pindots" id="pinDots">${dots()}</div>
+      <div class="pinpad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join('')}<span></span><button data-k="0">0</button><button data-k="del" aria-label="Delete"><svg><use href="#i-back"/></svg></button></div>`,
+      () => { document.removeEventListener('keydown', onKey, true); if (!done) { done = true; resolve(null); } });
+    const press = k => {
+      if (k === 'del') pin = pin.slice(0, -1);
+      else if (pin.length < 4) pin += k;
+      $('#pinDots', b).innerHTML = dots();
+      if (pin.length === 4) { done = true; setTimeout(() => { closeSheet(); resolve(pin); }, 120); }
+    };
+    const onKey = e => {
+      if (/^\d$/.test(e.key)) { press(e.key); e.preventDefault(); e.stopPropagation(); }
+      else if (e.key === 'Backspace') { press('del'); e.preventDefault(); e.stopPropagation(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    b.onclick = e => { const k = e.target.closest('[data-k]')?.dataset.k; if (k != null) { navigator.vibrate?.(8); press(k); } };
+  });
+}
+async function setNewPin() {
+  const a = await askPin('Create a PIN', 'Choose 4 digits to lock your Private folder.');
+  if (!a) return false;
+  const c = await askPin('Confirm PIN', 'Enter the same 4 digits again.');
+  if (!c) return false;
+  if (a !== c) { snack('The PINs didn’t match — try again'); return false; }
+  const salt = [...crypto.getRandomValues(new Uint8Array(12))].map(x => x.toString(16).padStart(2, '0')).join('');
+  pinRec = { salt, hash: await hashPin(a, salt) };
+  store.set('pin', pinRec);
+  privUnlocked = true;
+  snack('PIN set — your Private folder is locked');
+  return true;
+}
+async function verifyPin(title = 'Enter PIN') {
+  if (!pinRec) return true;
+  let sub = 'Enter your 4-digit PIN.';
+  for (;;) {
+    if (Date.now() < pinLockUntil) { snack(`Too many wrong tries. Try again in ${Math.ceil((pinLockUntil - Date.now()) / 1000)} s`); return false; }
+    const p = await askPin(title, sub);
+    if (p == null) return false;
+    if (await hashPin(p, pinRec.salt) === pinRec.hash) { pinFails = 0; return true; }
+    pinFails++; navigator.vibrate?.([40, 60, 40]);
+    if (pinFails >= 5) { pinFails = 0; pinLockUntil = Date.now() + 30000; }
+    sub = '<span class="err">Wrong PIN. Try again.</span>';
+  }
+}
+async function openPrivate() {
+  if (!pinRec) {
+    const ok = await confirmSheet('Private folder',
+      'Keep videos and songs out of your library behind a 4-digit PIN. Long-press any file and choose <b>Move to Private</b>.<br><br><span class="muted">Private files are hidden inside Open Player only. Your gallery and file manager can still see them.</span>',
+      'Create PIN');
+    if (!ok || !(await setNewPin())) return;
+  } else if (!privUnlocked) {
+    if (!(await verifyPin('Unlock Private'))) return;
+    privUnlocked = true;
+  }
+  lib.tab = 'folders'; lib.folder = PRIV; render(); listEl.scrollTop = 0; hydrateThumbs();
+}
+function lockPrivate() {
+  privUnlocked = false;
+  if (lib.folder === PRIV) { lib.folder = null; render(); }
+}
+async function togglePrivate(it) {
+  if (privateIds.has(it.id)) {
+    privateIds.delete(it.id); savePrivate(); render(); snack('Moved back to your library'); return;
+  }
+  if (!pinRec && !(await setNewPin())) return;
+  privateIds.add(it.id); savePrivate();
+  recents = recents.filter(r => r.id !== it.id); store.set('recents', recents);
+  render();
+  snack('Moved to Private', 'Undo', () => { privateIds.delete(it.id); savePrivate(); render(); });
+}
+async function sheetPrivacy() {
+  if (!pinRec) {
+    if (await setNewPin()) snack('PIN set. Long-press any file → Move to Private', null, null, 5000);
+    return;
+  }
+  const b = openSheet('Private folder',
+    opt('open', 'i-lock', 'Open Private folder') +
+    opt('change', 'i-edit', 'Change PIN') +
+    opt('remove', 'i-trash', 'Turn off PIN<small>Moves all private files back to your library</small>', '', 'danger') +
+    `<p class="sheet-note">Forgot your PIN? Clear Open Player’s storage in Android settings to reset it (this also clears your watch history).</p>`);
+  b.onclick = async e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    closeSheet();
+    if (o === 'open') return openPrivate();
+    if (!(await verifyPin(o === 'change' ? 'Current PIN' : 'Enter PIN'))) return;
+    if (o === 'change') { await setNewPin(); return; }
+    if (o === 'remove') {
+      if (!(await confirmSheet('Turn off PIN?', `${plural(privateIds.size, 'private file')} will appear in your library again.`, 'Turn off', true))) return;
+      pinRec = null; store.del('pin'); privateIds.clear(); savePrivate(); privUnlocked = false;
+      if (lib.folder === PRIV) lib.folder = null;
+      render(); snack('PIN turned off');
+    }
+  };
+}
+
+/* ---------- long-press menu ---------- */
+const canFileOps = it => NATIVE && it.native && ((it.nuri && it.nuri.startsWith('content://media')) || (it.npath && allFiles));
+function sheetItemMenu(it) {
+  if (!it) return;
+  const inPriv = privateIds.has(it.id);
+  const fileOps = canFileOps(it);
+  const playing = !!P.item;
+  const b = openSheet(it.title || it.name,
+    opt('play', 'i-play', 'Play') +
+    (playing && P.item !== it ? opt('next', 'i-next', 'Play next') + opt('queue', 'i-queue', 'Add to end of queue') : '') +
+    opt('plist', 'i-plist', 'Add to playlist') +
+    (lib.tab === 'playlists' && lib.playlist ? opt('unplist', 'i-close', 'Remove from this playlist') : '') +
+    opt('private', 'i-lock', inPriv ? 'Remove from Private' : 'Move to Private') +
+    (fileOps ? opt('rename', 'i-edit', 'Rename') : '') +
+    (fileOps ? opt('delete', 'i-trash', 'Delete from device', '', 'danger')
+      : opt('remove', 'i-trash', 'Remove from list' + (NATIVE ? '' : '<small>The file stays on your device</small>'), '', 'danger')) +
+    opt('info', 'i-info', 'Details'));
+  b.onclick = async e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    closeSheet();
+    if (o === 'play') return openPlayer(it, visibleQueueFor(it));
+    if (o === 'next') return playNext(it);
+    if (o === 'queue') return addToQueue(it);
+    if (o === 'plist') return sheetAddToPlaylist([it]);
+    if (o === 'unplist') {
+      const pl = plById(lib.playlist); if (!pl) return;
+      const i = pl.items.findIndex(x => x.id === it.id); if (i < 0) return;
+      const [removed] = pl.items.splice(i, 1); pl.ts = Date.now(); savePlaylists(); render();
+      return snack('Removed from playlist', 'Undo', () => { pl.items.splice(i, 0, removed); savePlaylists(); render(); });
+    }
+    if (o === 'private') return togglePrivate(it);
+    if (o === 'rename') return renameItem(it);
+    if (o === 'delete') return deleteItem(it);
+    if (o === 'remove') { forgetItem(it, false); render(); return snack('Removed from list'); }
+    if (o === 'info') return showInfo(it);
+  };
+}
+function migrateId(oldId, newId) {
+  if (oldId === newId) return;
+  const it = lib.byId.get(oldId);
+  if (it) { lib.byId.delete(oldId); it.id = newId; lib.byId.set(newId, it); }
+  if (progress[oldId]) { progress[newId] = progress[oldId]; delete progress[oldId]; store.set('progress', progress); }
+  recents.forEach(r => { if (r.id === oldId) r.id = newId; }); store.set('recents', recents);
+  if (privateIds.delete(oldId)) { privateIds.add(newId); savePrivate(); }
+  playlists.forEach(pl => pl.items.forEach(e => { if (e.id === oldId) e.id = newId; })); savePlaylists();
+  if (allMarks[oldId]) { allMarks[newId] = allMarks[oldId]; delete allMarks[oldId]; store.set('bookmarks', allMarks); }
+  if (allDelays[oldId]) { allDelays[newId] = allDelays[oldId]; delete allDelays[oldId]; store.set('audioDelays', allDelays); }
+}
+/* Remove an item from the app's lists. deleted=true also drops its history (the file is gone). */
+function forgetItem(it, deleted) {
+  lib.items = lib.items.filter(i => i !== it); lib.byId.delete(it.id);
+  if (it.url) URL.revokeObjectURL(it.url);
+  if (deleted) {
+    delete progress[it.id]; store.set('progress', progress);
+    recents = recents.filter(r => r.id !== it.id); store.set('recents', recents);
+    if (privateIds.delete(it.id)) savePrivate();
+    playlists.forEach(pl => { pl.items = pl.items.filter(e => e.id !== it.id); }); savePlaylists();
+    delete allMarks[it.id]; store.set('bookmarks', allMarks);
+  }
+  const qi = P.queue.indexOf(it);
+  if (qi >= 0) {
+    if (P.item === it) {
+      const active = !P.el.hidden || !$('#mini').hidden;
+      if (P.queue.length > 1 && active) {
+        P.queue.splice(qi, 1);
+        if (P.origQueue) P.origQueue = P.origQueue.filter(x => x !== it);
+        P.idx = Math.min(qi, P.queue.length - 1);
+        load(P.queue[P.idx]);
+      } else {
+        P.v.pause(); P.v.removeAttribute('src'); P.v.load(); P.item = null; P.queue = []; P.idx = -1;
+        hideMini(); if (!P.el.hidden) closePlayer();
+      }
+    } else {
+      P.queue.splice(qi, 1);
+      if (P.origQueue) P.origQueue = P.origQueue.filter(x => x !== it);
+      if (qi < P.idx) P.idx--;
+    }
+    updateQueueUi();
+  }
+  if (lib.folder && lib.folder !== PRIV && !lib.items.some(i => i.folder === lib.folder)) lib.folder = null;
+}
+async function deleteItem(it) {
+  const ok = await confirmSheet('Delete from device?', `“${esc(it.name)}” will be permanently deleted from your phone. This can’t be undone.`, 'Delete', true);
+  if (!ok) return;
+  try {
+    const r = await ML.deleteMedia({ uri: it.nuri || null, path: it.npath || null });
+    if (!r || !r.done) { if (!r?.cancelled) snack('Couldn’t delete this file'); return; }
+    forgetItem(it, true); render(); snack('Deleted');
+  } catch (e) { snack(e?.message ? `Couldn’t delete: ${e.message}` : 'Couldn’t delete this file'); }
+}
+async function renameItem(it) {
+  const dot = it.name.lastIndexOf('.');
+  const ext = dot > 0 ? it.name.slice(dot) : '';
+  const base = dot > 0 ? it.name.slice(0, dot) : it.name;
+  let name = await askText('Rename', base, { suffix: ext, ok: 'Rename' });
+  if (name == null) return;
+  name = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').trim();
+  if (!name || name === base) return;
+  try {
+    const r = await ML.renameMedia({ uri: it.nuri || null, path: it.npath || null, name: name + ext });
+    if (!r || !r.done) { if (!r?.cancelled) snack('Couldn’t rename this file'); return; }
+    it.name = r.name || name + ext;
+    if (it.kind === 'audio' && (!it.title || it.title === base)) it.title = name;
+    if (r.path) {
+      it.npath = r.path;
+      const newSrc = nativeSrc(it.npath, it.nuri);
+      if (P.item === it && newSrc !== it.src) {
+        // the old path no longer exists: reopen the renamed file at the same spot
+        const wasPlaying = !P.v.paused;
+        P.pendingStart = P.v.currentTime; P.v.src = newSrc;
+        if (wasPlaying) P.v.play().catch(() => {});
+      }
+      it.src = newSrc;
+      if (it.id.startsWith('fs:')) migrateId(it.id, 'fs:' + r.path);
+    }
+    recents.forEach(x => { if (x.id === it.id) x.name = it.name; }); store.set('recents', recents);
+    playlists.forEach(pl => pl.items.forEach(e => { if (e.id === it.id) e.name = it.title || it.name; })); savePlaylists();
+    if (P.item === it) $('#vTitle').textContent = it.kind === 'audio' ? (it.title || it.name) : it.name;
+    render(); snack('Renamed');
+  } catch (e) {
+    snack(/exist/i.test(e?.message || '') ? 'A file with that name already exists' : 'Couldn’t rename this file');
+  }
+}
+
+/* ---------- play queue, play next, shuffle ---------- */
+function updateQueueUi() {
+  const it = P.item; if (!it) return;
+  P.idx = Math.max(0, P.queue.indexOf(it));
+  $('#vSub').textContent = P.queue.length > 1 ? `${P.idx + 1} of ${P.queue.length} · ${it.folder || ''}` : (it.folder || '');
+  const noPrev = P.idx <= 0, noNext = P.idx >= P.queue.length - 1;
+  $('#btnPrev').disabled = noPrev; $('#btnPrev').style.opacity = noPrev ? .35 : 1;
+  $('#btnNext').disabled = noNext; $('#btnNext').style.opacity = noNext ? .35 : 1;
+  setupMediaSession();
+}
+function playNext(it) {
+  if (!P.item) return openPlayer(it, [it]);
+  const at = P.queue.indexOf(it);
+  if (at >= 0 && at !== P.idx) { P.queue.splice(at, 1); if (at < P.idx) P.idx--; }
+  P.queue.splice(P.idx + 1, 0, it);
+  if (P.origQueue && !P.origQueue.includes(it)) P.origQueue.push(it);
+  updateQueueUi();
+  snack(`“${it.title || it.name}” will play next`);
+}
+function addToQueue(it) {
+  if (!P.item) return openPlayer(it, [it]);
+  if (P.queue.includes(it)) return snack('Already in the queue');
+  P.queue.push(it);
+  if (P.origQueue) P.origQueue.push(it);
+  updateQueueUi();
+  snack(`Added to queue · ${P.queue.length - P.idx - 1} up next`);
+}
+function shuffled(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function applyShuffle(on) {
+  const cur = P.item;
+  if (on) {
+    if (!P.origQueue) P.origQueue = P.queue.slice();
+    P.queue = cur ? [cur, ...shuffled(P.queue.filter(x => x !== cur))] : shuffled(P.queue);
+  } else if (P.origQueue) {
+    const extra = P.queue.filter(x => !P.origQueue.includes(x));
+    P.queue = P.origQueue.filter(x => P.queue.includes(x)).concat(extra);
+    P.origQueue = null;
+  }
+  updateQueueUi();
+}
+function setShuffle(on) {
+  S.shuffle = on; saveSettings();
+  applyShuffle(on);
+  ptoast(on ? 'Shuffle on' : 'Shuffle off');
+}
+function sheetQueue() {
+  const draw = () => {
+    const upNext = P.queue.length - P.idx - 1;
+    return `<div class="qbar">
+        <span>${plural(P.queue.length, 'item')}${upNext > 0 ? ` · ${upNext} up next` : ''}</span>
+        <button class="chip-toggle${S.shuffle ? ' on' : ''}" data-q="shuffle"><svg><use href="#i-shuffle"/></svg>Shuffle</button>
+      </div>
+      <div class="qlist">${P.queue.map((it, i) => `
+        <div class="qrow${i === P.idx ? ' cur' : ''}">
+          <button class="qmain" data-q="jump" data-i="${i}">
+            <span class="qn">${i === P.idx ? '<svg><use href="#i-play"/></svg>' : i + 1}</span>
+            <span class="qt"><b>${esc(it.title || it.name)}</b><small>${esc(it.kind === 'audio' ? (it.artist || '') : (it.folder || ''))}${it.dur ? ' · ' + fmtTime(it.dur) : ''}</small></span>
+          </button>
+          <button class="icon-btn sm" data-q="up" data-i="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Move up"><svg><use href="#i-up"/></svg></button>
+          <button class="icon-btn sm" data-q="down" data-i="${i}" ${i === P.queue.length - 1 ? 'disabled' : ''} aria-label="Move down"><svg><use href="#i-down"/></svg></button>
+          ${i === P.idx ? '<span class="qgap"></span>' : `<button class="icon-btn sm" data-q="del" data-i="${i}" aria-label="Remove"><svg><use href="#i-close"/></svg></button>`}
+        </div>`).join('')}</div>
+      ${upNext > 0 ? opt('clear', 'i-trash', 'Clear up next') : ''}
+      ${opt('saveq', 'i-plist', 'Save queue as playlist')}`;
+  };
+  const b = openSheet('Play queue', draw());
+  const cur = b.querySelector('.qrow.cur'); if (cur) cur.scrollIntoView({ block: 'center' });
+  b.onclick = async e => {
+    const q = e.target.closest('[data-q]'), o = e.target.closest('[data-o]')?.dataset.o;
+    if (o === 'clear') { P.queue = P.queue.slice(0, P.idx + 1); if (P.origQueue) P.origQueue = P.origQueue.filter(x => P.queue.includes(x)); updateQueueUi(); b.innerHTML = draw(); return; }
+    if (o === 'saveq') {
+      closeSheet();
+      const name = await askText('Save queue as playlist', '', { placeholder: 'Playlist name', ok: 'Save' });
+      if (name) { createPlaylist(name, P.queue); snack(`Saved “${name}”`); render(); }
+      return;
+    }
+    if (!q || q.disabled) return;
+    const i = +q.dataset.i, a = q.dataset.q;
+    if (a === 'shuffle') setShuffle(!S.shuffle);
+    if (a === 'jump') { if (i !== P.idx) { P.idx = i; load(P.queue[i]); } closeSheet(); return; }
+    if (a === 'up' || a === 'down') {
+      const j = a === 'up' ? i - 1 : i + 1;
+      [P.queue[i], P.queue[j]] = [P.queue[j], P.queue[i]];
+      updateQueueUi();
+    }
+    if (a === 'del') {
+      const [gone] = P.queue.splice(i, 1);
+      if (P.origQueue) P.origQueue = P.origQueue.filter(x => x !== gone);
+      updateQueueUi();
+    }
+    const sc = b.scrollTop; b.innerHTML = draw(); sheet.scrollTop = sc;
+  };
+}
+
+/* ---------- playlists ---------- */
+let playlists = store.get('playlists', []);    // [{ id, name, items: [{ id, name, kind }], ts }]
+const savePlaylists = () => store.set('playlists', playlists);
+const plById = id => playlists.find(p => p.id === id);
+const plEntries = pl => pl.items.map((e, i) => ({ e, i, it: lib.byId.get(e.id) })).filter(x => !(x.it && privateIds.has(x.it.id)));
+function playlistOrder(pl) {
+  const ents = plEntries(pl).map(x => ({ ...x, order: x.i, name: x.it?.name || x.e.name, title: x.it?.title, artist: x.it?.artist, mtime: x.it?.mtime || 0, size: x.it?.size || 0, dur: x.it?.dur || 0 }));
+  return sortBy(ents, 'playlist');
+}
+const plPlayable = pl => playlistOrder(pl).filter(x => x.it).map(x => x.it);
+function createPlaylist(name, items = []) {
+  const pl = { id: 'pl' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, items: [], ts: Date.now() };
+  for (const it of items) if (!pl.items.some(e => e.id === it.id)) pl.items.push({ id: it.id, name: it.title || it.name, kind: it.kind });
+  playlists.push(pl); savePlaylists();
+  return pl;
+}
+function addToPlaylist(pl, items) {
+  let n = 0;
+  for (const it of items) if (!pl.items.some(e => e.id === it.id)) { pl.items.push({ id: it.id, name: it.title || it.name, kind: it.kind }); n++; }
+  pl.ts = Date.now(); savePlaylists();
+  return n;
+}
+function sheetAddToPlaylist(items) {
+  const has = pl => items.every(it => pl.items.some(e => e.id === it.id));
+  const b = openSheet('Add to playlist',
+    opt('new', 'i-plus', 'New playlist…') +
+    playlists.map(pl => opt('pl:' + pl.id, has(pl) ? 'i-check' : 'i-plist', `${esc(pl.name)}<small>${plural(pl.items.length, 'item')}</small>`, has(pl) ? '<span class="val">Added</span>' : '', has(pl) ? 'sel' : '')).join(''));
+  b.onclick = async e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    closeSheet();
+    if (o === 'new') {
+      const name = await askText('New playlist', '', { placeholder: 'Playlist name', ok: 'Create' });
+      if (!name) return;
+      createPlaylist(name, items); render();
+      return snack(`Added to “${name}”`);
+    }
+    const pl = plById(o.slice(3)); if (!pl) return;
+    const n = addToPlaylist(pl, items); render();
+    snack(n ? `Added to “${pl.name}”` : `Already in “${pl.name}”`);
+  };
+}
+function playPlaylist(pl, shuffleIt) {
+  const q = plPlayable(pl);
+  if (!q.length) return snack('Nothing in this playlist is on this device right now');
+  if (shuffleIt && !S.shuffle) { S.shuffle = true; saveSettings(); }
+  openPlayer(shuffleIt ? q[Math.floor(Math.random() * q.length)] : q[0], q);
+}
+function sheetPlaylistMenu(pl) {
+  const b = openSheet(pl.name,
+    opt('play', 'i-play', 'Play') + opt('shuffle', 'i-shuffle', 'Shuffle play') +
+    (P.item ? opt('queue', 'i-queue', 'Add to end of queue') : '') +
+    opt('rename', 'i-edit', 'Rename') + opt('delete', 'i-trash', 'Delete playlist<small>Your files are not deleted</small>', '', 'danger'));
+  b.onclick = async e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    closeSheet();
+    if (o === 'play') return playPlaylist(pl, false);
+    if (o === 'shuffle') return playPlaylist(pl, true);
+    if (o === 'queue') {
+      const add = plPlayable(pl).filter(it => !P.queue.includes(it));
+      P.queue.push(...add); if (P.origQueue) P.origQueue.push(...add); updateQueueUi();
+      return snack(`Added ${plural(add.length, 'item')} to the queue`);
+    }
+    if (o === 'rename') {
+      const name = await askText('Rename playlist', pl.name, { ok: 'Rename' });
+      if (name) { pl.name = name; pl.ts = Date.now(); savePlaylists(); render(); }
+      return;
+    }
+    if (o === 'delete') {
+      const i = playlists.indexOf(pl); playlists.splice(i, 1); savePlaylists();
+      if (lib.playlist === pl.id) lib.playlist = null;
+      render();
+      snack(`Deleted “${pl.name}”`, 'Undo', () => { playlists.splice(i, 0, pl); savePlaylists(); render(); });
+    }
+  };
+}
+function sheetPlaylists() {
+  const short = s => (s.length > 34 ? s.slice(0, 32) + '…' : s);
+  const b = openSheet('Playlists',
+    opt('addcur', 'i-plus', `Add this ${P.item.kind === 'audio' ? 'song' : 'video'} to a playlist<small>${esc(short(P.item.title || P.item.name))}</small>`) +
+    (P.queue.length > 1 ? opt('saveq', 'i-queue', `Save queue as playlist<small>${plural(P.queue.length, 'item')}</small>`) : '') +
+    (playlists.length ? '<div class="group">Play a playlist</div>' + playlists.map(pl => opt('pl:' + pl.id, 'i-plist', `${esc(pl.name)}<small>${plural(pl.items.length, 'item')}</small>`)).join('') : ''));
+  b.onclick = async e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    closeSheet();
+    if (o === 'addcur') return sheetAddToPlaylist([P.item]);
+    if (o === 'saveq') {
+      const name = await askText('Save queue as playlist', '', { placeholder: 'Playlist name', ok: 'Save' });
+      if (name) { createPlaylist(name, P.queue); snack(`Saved “${name}”`); render(); }
+      return;
+    }
+    const pl = plById(o.slice(3)); if (pl) playPlaylist(pl, S.shuffle);
+  };
+}
+
+/* ---------- frame preview while scrubbing ---------- */
+const PV = { v: $('#pvVideo'), src: null, want: null, busy: false, on: false };
+function pvReset() { PV.src = null; PV.want = null; PV.busy = false; try { PV.v.removeAttribute('src'); PV.v.load(); } catch {} }
+function pvEnabled() {
+  const it = P.item;
+  return !!(it && it.kind !== 'audio' && !it.remote && S.framePreview !== false && P.v.videoWidth);
+}
+function pvShow(container, t) {
+  if (!pvEnabled()) { $('#seekPrev').hidden = true; $('#hudPrev').hidden = true; return; }
+  const src = P.v.currentSrc || P.v.src;
+  if (PV.src !== src) { PV.src = src; PV.busy = false; PV.v.src = src; }
+  const host = container === 'hud' ? $('#hudPrev') : $('#seekPrev');
+  const other = container === 'hud' ? $('#seekPrev') : $('#hudPrev');
+  if (PV.v.parentElement !== host) host.appendChild(PV.v);
+  other.hidden = true; host.hidden = false;
+  const r = P.v.videoWidth / P.v.videoHeight || 16 / 9;
+  const w = r >= 1 ? 168 : Math.round(110 * r);
+  host.style.width = w + 'px'; host.style.height = Math.round(w / r) + 'px';
+  PV.want = t;
+  if (!PV.busy) pvGo();
+}
+function pvGo() {
+  if (PV.want == null) return;
+  const t = PV.want; PV.want = null;
+  if (PV.v.readyState < 1) { PV.want = t; PV.v.addEventListener('loadedmetadata', pvGo, { once: true }); return; }
+  PV.busy = true;
+  try { PV.v.currentTime = t; } catch { PV.busy = false; }
+}
+PV.v.addEventListener('seeked', () => { PV.busy = false; if (PV.want != null) pvGo(); });
+PV.v.addEventListener('error', () => { PV.busy = false; });
+function pvHide() { $('#seekPrev').hidden = true; $('#hudPrev').hidden = true; }
+
+/* ---------- subtitle character encodings ---------- */
+/* SUBENC-START */
+const SUB_ENCODINGS = [
+  ['auto', 'Automatic'], ['utf-8', 'Unicode (UTF-8)'], ['utf-16le', 'Unicode (UTF-16 LE)'], ['utf-16be', 'Unicode (UTF-16 BE)'],
+  ['windows-1252', 'Western European (Windows-1252)'], ['windows-1250', 'Central European (Windows-1250)'],
+  ['windows-1251', 'Cyrillic (Windows-1251)'], ['koi8-r', 'Cyrillic (KOI8-R)'], ['windows-1253', 'Greek (Windows-1253)'],
+  ['windows-1254', 'Turkish (Windows-1254)'], ['windows-1255', 'Hebrew (Windows-1255)'], ['windows-1256', 'Arabic (Windows-1256)'],
+  ['windows-874', 'Thai (Windows-874)'], ['windows-1258', 'Vietnamese (Windows-1258)'],
+  ['gb18030', 'Chinese Simplified (GBK)'], ['big5', 'Chinese Traditional (Big5)'],
+  ['shift_jis', 'Japanese (Shift-JIS)'], ['euc-jp', 'Japanese (EUC-JP)'], ['euc-kr', 'Korean (EUC-KR)'],
+];
+const encLabel = e => (SUB_ENCODINGS.find(x => x[0] === e) || [e, e])[1];
+const LEGACY_ENC = [
+  ['windows-1252', 'latin'], ['windows-1250', 'latin'], ['windows-1254', 'latin'], ['windows-1258', 'latin'],
+  ['windows-1251', 'cyr'], ['koi8-r', 'cyr'], ['windows-1253', 'greek'], ['windows-1255', 'hebrew'],
+  ['windows-1256', 'arabic'], ['windows-874', 'thai'],
+  ['gb18030', 'zhs'], ['big5', 'zht'], ['shift_jis', 'ja'], ['euc-jp', 'ja'], ['euc-kr', 'ko'],
+];
+const LANG_ENC = {
+  ru: 'windows-1251', uk: 'windows-1251', bg: 'windows-1251', sr: 'windows-1251', mk: 'windows-1251', be: 'windows-1251',
+  el: 'windows-1253', he: 'windows-1255', iw: 'windows-1255', ar: 'windows-1256', fa: 'windows-1256', ur: 'windows-1256',
+  tr: 'windows-1254', az: 'windows-1254', th: 'windows-874', vi: 'windows-1258',
+  pl: 'windows-1250', cs: 'windows-1250', sk: 'windows-1250', hu: 'windows-1250', ro: 'windows-1250', hr: 'windows-1250', sl: 'windows-1250', bs: 'windows-1250',
+  ja: 'shift_jis', ko: 'euc-kr', zh: 'gb18030',
+};
+function langHints() {
+  const out = new Set();
+  const langs = (typeof navigator !== 'undefined' && (navigator.languages || [navigator.language])) || [];
+  for (const l of langs) {
+    const L = String(l || '').toLowerCase();
+    if (/^zh-(tw|hk|mo)|hant/.test(L)) { out.add('big5'); continue; }
+    const enc = LANG_ENC[L.split('-')[0]]; if (enc) out.add(enc);
+  }
+  return out;
+}
+// Very common characters, used to tell real Chinese text from bytes decoded the wrong way.
+const ZHS = new Set('的一是不了人我在有他这中大来上国个到说们为子和你地出道也时年得就那要下以生会自着去之过家学对可她里后小么心多天而能好都然没日于起还发成事只作当想看文无开手十用主行方又如前所本见经头面公同三已老从动两长知民样现分将外但身些与高意进把法此实回二理美点月明其种声全工己话儿者向情部正名定女问力机给等几很业最间新什打便位因重被走电四第门相次东政海口使教西再平真听世气信北少关并内加化由却代军产入先山五太水万市眼体别处总才场师书比住员九笑性通目华报立马命张活难神数件安表原车白应路期叫死常提感金何更反合放做系计或司利受光王果亲界及今京务制解各任至清物台象记边共风战干接它许八特觉望直服毛林题建南度统色字请交爱让认算论百吃义科怎元社术结六功指思非流每青管夫连远资队跟带花快条院变联言权往展该领传近留红治决周保达办运武半候七必城父强步完革深区即求品士转量空甚众技轻程告江语英基派满式李息写呢识极令黄德收脸钱党倒未持取设始版双历越史商千片容研像找友孩站广改议形委早房音火际则首单跑吗啊哪谁吧');
+const ZHT = new Set('的一是不了人我在有他這中大來上國個到說們為子和你地出道也時年得就那要下以生會自著去之過家學對可她裡後小麼心多天而能好都然沒日於起還發成事只作當想看文無開手十用主行方又如前所本見經頭面公同三已老從動兩長知民樣現分將外但身些與高意進把法此實回二理美點月明其種聲全工己話兒者向情部正名定女問力機給等幾很業最間新什打便位因重被走電四第門相次東政海口使教西再平真聽世氣信北少關並內加化由卻代軍產入先山五太水萬市眼體別處總才場師書比住員九笑性通目華報立馬命張活難神數件安表原車白應路期叫死常提感金何更反合放做系計或司利受光王果親界及今京務制解各任至清物台象記邊共風戰干接它許八特覺望直服毛林題建南度統色字請交愛讓認算論百吃義科怎元社術結六功指思非流每青管夫連遠資隊跟帶花快條院變聯言權往展該領傳近留紅治決週保達辦運武半候七必城父強步完革深區即求品士轉量空甚眾技輕程告江語英基派滿式李息寫呢識極令黃德收臉錢黨倒未持取設始版雙歷越史商千片容研像找友孩站廣改議形委早房音火際則首單跑嗎啊哪誰吧');
+// Letters that real text in each script always contains, but wrongly decoded bytes rarely produce.
+const CYR_MARKERS = new Set('яЯјЈљЉњЊћЋџЏђЂіІїЇєЄ');
+const GREEK_MARKERS = new Set('άέήίόύώΆΈΉΊΌΎΏ');
+const ARABIC_MARKERS = new Set('ال');
+const SCRIPT_RX = {
+  latin: /[À-ɏḀ-ỿ]/, cyr: /[Ѐ-ӿ]/, greek: /[Ͱ-Ͽ]/, hebrew: /[֐-׿]/,
+  arabic: /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/, thai: /[฀-๿]/,
+  kana: /[぀-ヿ]/, han: /[㐀-䶿一-鿿]/, ko: /[가-힯ᄀ-ᇿ㄰-㆏]/,
+};
+const NEUTRAL_RX = /[ -¿×÷‐-⁯€™　-〿！-／：-＠]/;
+function scoreText(text, script) {
+  let nonAscii = 0, inScript = 0, letters = 0, hiLetters = 0, lower = 0, cased = 0, bad = 0, han = 0, common = 0, kana = 0, markers = 0, markers2 = 0;
+  let prev = 0, comb = 0, orphan = 0, lead = 0, leadBad = 0;   // Thai spelling rules
+  let prevLower = false, midCaps = 0;                            // e.g. "кЬнейт": a capital inside a word
+  const cps = script === 'thai' ? [...text].map(x => x.codePointAt(0)) : null;
+  let idx = -1;
+  const rx = SCRIPT_RX[script === 'zhs' || script === 'zht' ? 'han' : script === 'ja' ? 'kana' : script];
+  for (const ch of text) {
+    const c = ch.codePointAt(0); idx++;
+    if (script === 'thai') {
+      const isComb = c === 0x0E31 || (c >= 0x0E34 && c <= 0x0E3A) || (c >= 0x0E47 && c <= 0x0E4E);
+      const prevBase = (prev >= 0x0E01 && prev <= 0x0E2E) || prev === 0x0E31 || (prev >= 0x0E34 && prev <= 0x0E3A) || (prev >= 0x0E47 && prev <= 0x0E4E);
+      if (isComb) { comb++; if (!prevBase) orphan++; }
+      if (c >= 0x0E40 && c <= 0x0E44) { lead++; const nx = cps[idx + 1] || 0; if (!(nx >= 0x0E01 && nx <= 0x0E2E)) leadBad++; }
+      prev = c;
+    } else if (script === 'cyr' || script === 'greek') {
+      const lo = ch.toLowerCase(), up = ch.toUpperCase();
+      if (lo !== up) { if (ch === up && prevLower) midCaps++; prevLower = ch === lo; } else prevLower = false;
+    }
+    if (c < 128) { const l = c | 32; if (l >= 97 && l <= 122) letters++; continue; }
+    if ((c >= 0x80 && c < 0xA0) || c === 0xFFFD || (c >= 0xE000 && c <= 0xF8FF)) { nonAscii++; bad++; continue; }
+    if (NEUTRAL_RX.test(ch)) continue;
+    nonAscii++;
+    const up = ch.toUpperCase(), lo = ch.toLowerCase();
+    if (up !== lo) { cased++; if (ch === lo) lower++; letters++; hiLetters++; }
+    else if (/\p{L}/u.test(ch)) { letters++; hiLetters++; }
+    if (rx && rx.test(ch)) inScript++;
+    if (script === 'zhs' || script === 'zht' || script === 'ja') {
+      if (SCRIPT_RX.han.test(ch)) { han++; if ((script === 'zht' ? ZHT : ZHS).has(ch)) common++; }
+      if (SCRIPT_RX.kana.test(ch)) kana++;
+    }
+    if (script === 'cyr' && CYR_MARKERS.has(ch)) markers++;
+    else if (script === 'greek' && GREEK_MARKERS.has(ch)) markers++;
+    else if (script === 'arabic' && ARABIC_MARKERS.has(ch)) markers++;
+    else if (script === 'thai') { if (c >= 0x0E01 && c <= 0x0E2E) markers++; else if (c >= 0x0E48 && c <= 0x0E4B) markers2++; }
+  }
+  if (!nonAscii) return 0.5;
+  const frac = inScript / nonAscii, hiRatio = letters ? hiLetters / letters : 0;
+  const caseF = 0.5 + 0.5 * (cased ? lower / cased : 1);
+  let s;
+  const enough = inScript >= 100;
+  const implausible = enough && (
+    ((script === 'cyr' || script === 'greek') && midCaps / inScript > 0.01) ||
+    (script === 'cyr' && markers / inScript < 0.008) ||
+    (script === 'greek' && markers / inScript < 0.02) ||
+    (script === 'arabic' && markers / inScript < 0.10) ||
+    (script === 'thai' && (markers / inScript < 0.25 || markers2 / inScript < 0.01 || (comb >= 20 && orphan / comb > 0.1) || (lead >= 10 && leadBad / lead > 0.15))));
+  const plaus = implausible ? 0.35 : 1;
+  if (script === 'latin') s = frac * (1 - hiRatio) * caseF;
+  else if (script === 'cyr' || script === 'greek') s = frac * Math.min(1, hiRatio * 1.3) * caseF * plaus;
+  else if (script === 'zhs' || script === 'zht') s = (han / nonAscii) * Math.min(1, (common / Math.max(1, han)) / 0.3);
+  else if (script === 'ja') s = ((kana + han * 0.5) / nonAscii) * (kana ? 1 : 0.4);
+  else s = frac * Math.min(1, hiRatio * 1.3) * plaus;
+  return s - bad / nonAscii;
+}
+function detectEncoding(buf) {
+  const b = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  if (b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return 'utf-8';
+  if (b[0] === 0xFF && b[1] === 0xFE) return 'utf-16le';
+  if (b[0] === 0xFE && b[1] === 0xFF) return 'utf-16be';
+  const n = Math.min(b.length, 4000);
+  let zEven = 0, zOdd = 0;
+  for (let i = 0; i < n; i++) if (!b[i]) (i % 2 ? zOdd++ : zEven++);
+  if (n > 20 && zOdd > n * 0.2 && zEven < n * 0.02) return 'utf-16le';
+  if (n > 20 && zEven > n * 0.2 && zOdd < n * 0.02) return 'utf-16be';
+  try { new TextDecoder('utf-8', { fatal: true }).decode(b); return 'utf-8'; } catch {}
+  // Legacy code pages: score each candidate on how much the result looks like real text.
+  let end = Math.min(b.length, 96 * 1024);
+  if (end < b.length) { const nl = b.lastIndexOf(0x0A, end); if (nl > 0) end = nl; }
+  const sample = b.subarray(0, end);
+  const hints = langHints();
+  let best = 'windows-1252', bestScore = -Infinity;
+  for (const [enc, script] of LEGACY_ENC) {
+    let text;
+    try { text = new TextDecoder(enc, { fatal: true }).decode(sample); } catch { continue; }
+    const s = scoreText(text, script) + (hints.has(enc) ? 0.04 : 0);   // phone language only breaks near-ties
+    if (s > bestScore + 1e-9) { bestScore = s; best = enc; }
+  }
+  return best;
+}
+/* SUBENC-END */
+function decodeSubs() {
+  if (!P.subBuf) return;
+  const enc = P.subEncForced || detectEncoding(P.subBuf);
+  P.subEnc = enc;
+  let text;
+  try { text = new TextDecoder(enc).decode(P.subBuf); } catch { text = new TextDecoder('utf-8').decode(P.subBuf); }
+  P.cues = parseSubs(text); P.subOn = true; lastSubText = null; renderSub();
+}
+function sheetSubEncoding() {
+  const cur = P.subEncForced || 'auto';
+  const b = openSheet('Character encoding',
+    `<p class="sheet-note">If subtitles show strange symbols or question marks, pick the language they’re written in.</p>` +
+    SUB_ENCODINGS.map(([k, l]) => opt('e:' + k, k === cur ? 'i-check' : 'i-text',
+      l + (k === 'auto' && P.subEnc ? `<small>Detected: ${esc(encLabel(P.subEnc))}</small>` : ''), '', k === cur ? 'sel' : '')).join(''));
+  b.onclick = e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    const k = o.slice(2);
+    P.subEncForced = k === 'auto' ? null : k;
+    decodeSubs();
+    closeSheet();
+    ptoast(P.cues.length ? `Subtitles: ${encLabel(P.subEnc)}` : 'No subtitle lines found with that encoding');
+  };
+}
+
+/* ---------- headphones: pause on unplug, resume on reconnect ---------- */
+function onHeadphones(ev) {
+  const connected = !!ev?.connected;
+  if (!connected) {
+    if (S.hpPause && P.item && !P.v.paused) {
+      P.v.pause(); P.unplugAt = Date.now();
+      (P.el.hidden ? snack : ptoast)('Paused — headphones disconnected');
+    }
+  } else if (S.hpResume && P.unplugAt && Date.now() - P.unplugAt < 15 * 60e3 && P.item && P.v.paused) {
+    P.unplugAt = 0;
+    P.v.play().catch(() => {});
+    (P.el.hidden ? snack : ptoast)('Resumed — headphones connected');
+  }
+}
+if (NATIVE) { try { ML.addListener('headphones', onHeadphones); } catch {} }
+
+/* ---------- seek step shown on the skip buttons ---------- */
+function applySeekStepIcons() { $$('#i-rew text, #i-fwd text').forEach(t => (t.textContent = S.seekStep)); }
+applySeekStepIcons();
+const gestureSens = () => ({ slow: 0.55, normal: 1, fast: 1.7 }[S.gestureSens] || 1);
+
 /* ---------------- boot ---------------- */
 render();
 setupSW();
@@ -1873,4 +2723,4 @@ importShared();
   if (!S.onboarded && (NATIVE || IS_ANDROID_BROWSER)) showOnboarding();
 })();
 if (store.get('justRefreshed', false)) { store.del('justRefreshed'); setTimeout(() => snack('App cache refreshed — you’re on the latest files'), 300); }
-window.OpenPlayer = { lib, P, S, version: APP_VERSION };
+window.OpenPlayer = { lib, P, S, version: APP_VERSION, get playlists() { return playlists; }, privateIds, detectEncoding };

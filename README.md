@@ -35,11 +35,25 @@ An ad-free video and music player for your phone — as an **Android app** (reco
 - **Video adjustments**: brightness, contrast, saturation, hue, mirror
 - **Video details**: resolution, frame rate, bitrate, dropped frames
 - Screen recordings (WebM files with no stored length) play with a working seek bar
+- **Frame preview** while dragging the seek bar or swiping to seek
+- **Play queue**: reorder, remove, jump; **Play next** / **Add to end of queue** from any list; **Shuffle**
+- **Playlists**: create, add to, play, shuffle, rename, delete (Playlists tab, or ⋮ → Playlists)
+- **Subtitle encodings**: detects UTF-8/16, Windows-1250…1258, KOI8-R, GBK, Big5, Shift-JIS, EUC-JP/KR, Thai; manual override in the subtitle menu
+- **Headphones** (Android app): pause on disconnect, resume on reconnect
 - Lock-screen / notification media controls; keeps the screen on while playing
 
 **Cache tools (Settings → Storage & cache)**
 - **Refresh app cache** — clears the stored app files and reloads the latest version
 - Clear thumbnail cache, clear watch history
+
+**Library**
+- Sort every list its own way: folders, videos, Recent, songs, albums/artists, playlists
+- Long-press any file: Play, Play next, Add to queue, Add to playlist, Move to Private, Rename, Delete, Details
+- **Private folder** with a 4-digit PIN (stored as a salted SHA-256 hash). It hides files inside Open Player only; other apps can still see them.
+- Rename and delete need the Android app; Android shows its own confirmation for files other apps created
+
+**Settings**
+- Skip amount 5/10/15/30 s, gesture sensitivity (slow/normal/fast), controls auto-hide (2–8 s or never), frame preview on/off
 - Shows storage used; an update banner appears when a new version is deployed
 
 ## Android app (recommended)

@@ -2,19 +2,31 @@ package io.github.adhilbit.openplayer;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
+import android.app.RecoverableSecurityException;
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.IntentSender;
 import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.AudioDeviceCallback;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
@@ -24,6 +36,10 @@ import android.util.Size;
 import android.view.Window;
 import android.view.WindowManager;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -42,23 +58,65 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Open Player's bridge to Android: media permission, listing every video and
  * song on the device (MediaStore), thumbnails, saving files, and a few window
- * helpers (immersive fullscreen, rotation, keep-screen-on, picture-in-picture).
+ * helpers (immersive fullscreen, rotation, keep-screen-on, picture-in-picture),
+ * deleting / renaming files with Android's own confirmation, and headphone
+ * connect / disconnect events.
  */
 @CapacitorPlugin(
     name = "MediaLibrary",
     permissions = {
         @Permission(alias = "video", strings = { Manifest.permission.READ_MEDIA_VIDEO }),
         @Permission(alias = "audio", strings = { Manifest.permission.READ_MEDIA_AUDIO }),
-        @Permission(alias = "storage", strings = { Manifest.permission.READ_EXTERNAL_STORAGE })
+        @Permission(alias = "storage", strings = { Manifest.permission.READ_EXTERNAL_STORAGE }),
+        @Permission(alias = "write", strings = { Manifest.permission.WRITE_EXTERNAL_STORAGE })
     }
 )
 public class MediaLibraryPlugin extends Plugin {
 
     private static final boolean MODERN = Build.VERSION.SDK_INT >= 33;
+
+    private ActivityResultLauncher<IntentSenderRequest> confirmLauncher;
+    private PluginCall pendingCall;
+    private Runnable pendingOk;
+    private BroadcastReceiver noisyReceiver;
+    private AudioDeviceCallback deviceCallback;
+    private final Set<Integer> knownOutputs = new HashSet<>();
+
+    @Override
+    public void load() {
+        // Android shows its own "Allow Open Player to delete / modify this file?" dialog for
+        // files that belong to other apps. Its answer comes back here.
+        confirmLauncher = getBridge().registerForActivityResult(
+            new ActivityResultContracts.StartIntentSenderForResult(),
+            result -> {
+                PluginCall c = pendingCall;
+                Runnable ok = pendingOk;
+                pendingCall = null;
+                pendingOk = null;
+                if (c == null) return;
+                if (result.getResultCode() == Activity.RESULT_OK && ok != null) ok.run();
+                else c.resolve(outcome(false, true));
+            }
+        );
+        try { watchHeadphones(); } catch (Exception ignored) {}
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        try { if (noisyReceiver != null) getContext().unregisterReceiver(noisyReceiver); } catch (Exception ignored) {}
+        try {
+            AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+            if (am != null && deviceCallback != null) am.unregisterAudioDeviceCallback(deviceCallback);
+        } catch (Exception ignored) {}
+        super.handleOnDestroy();
+    }
 
     /* ---------------- permission ---------------- */
 
@@ -205,6 +263,233 @@ public class MediaLibraryPlugin extends Plugin {
             out.put(o);
             count[0]++;
         }
+    }
+
+    /* ---------------- delete & rename ---------------- */
+
+    private static JSObject outcome(boolean done, boolean cancelled) {
+        JSObject r = new JSObject();
+        r.put("done", done);
+        r.put("cancelled", cancelled);
+        return r;
+    }
+
+    /** Shows Android's confirmation dialog, then runs onOk if the user allows it. */
+    private void askUser(PluginCall call, IntentSender sender, Runnable onOk) {
+        Activity a = getActivity();
+        if (a == null || confirmLauncher == null) { call.reject("Can't ask for permission right now"); return; }
+        if (pendingCall != null) { call.reject("Another request is still waiting for your answer"); return; }
+        pendingCall = call;
+        pendingOk = onOk;
+        a.runOnUiThread(() -> {
+            try {
+                confirmLauncher.launch(new IntentSenderRequest.Builder(sender).build());
+            } catch (Exception e) {
+                pendingCall = null;
+                pendingOk = null;
+                call.reject("Can't ask for permission: " + e.getMessage());
+            }
+        });
+    }
+
+    private static Uri mediaUri(String s) {
+        return s != null && s.startsWith("content://media") ? Uri.parse(s) : null;
+    }
+
+    private String pathOf(Uri uri) {
+        if (uri == null) return null;
+        try (Cursor c = getContext().getContentResolver().query(uri, new String[] { "_data" }, null, null, null)) {
+            if (c != null && c.moveToFirst()) return str(c, "_data");
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private void scan(String... paths) {
+        try { MediaScannerConnection.scanFile(getContext(), paths, null, null); } catch (Exception ignored) {}
+    }
+
+    @PluginMethod
+    public void deleteMedia(PluginCall call) {
+        final Uri uri = mediaUri(call.getString("uri"));
+        final String path = call.getString("path");
+        final ContentResolver cr = getContext().getContentResolver();
+        try {
+            // With "All files access" the file can be removed directly.
+            if (path != null && hasAllFiles()) {
+                File f = new File(path);
+                if (f.exists() && !f.delete()) { call.reject("The file could not be deleted"); return; }
+                if (uri != null) { try { cr.delete(uri, null, null); } catch (Exception ignored) {} }
+                scan(path);
+                call.resolve(outcome(true, false));
+                return;
+            }
+            if (uri == null) { call.reject("This file can't be deleted from Open Player"); return; }
+            if (Build.VERSION.SDK_INT >= 30) {
+                PendingIntent pi = MediaStore.createDeleteRequest(cr, Collections.singletonList(uri));
+                askUser(call, pi.getIntentSender(), () -> call.resolve(outcome(true, false)));
+                return;
+            }
+            if (Build.VERSION.SDK_INT == 29) {
+                try {
+                    cr.delete(uri, null, null);
+                    call.resolve(outcome(true, false));
+                } catch (RecoverableSecurityException e) {
+                    askUser(call, e.getUserAction().getActionIntent().getIntentSender(), () -> {
+                        try {
+                            cr.delete(uri, null, null);
+                            call.resolve(outcome(true, false));
+                        } catch (Exception e2) {
+                            call.reject("Could not delete: " + e2.getMessage());
+                        }
+                    });
+                }
+                return;
+            }
+            if (getPermissionState("write") != PermissionState.GRANTED) {
+                requestPermissionForAlias("write", call, "writeCallback");
+                return;
+            }
+            String p = path != null ? path : pathOf(uri);
+            if (p != null) {
+                File f = new File(p);
+                if (f.exists() && !f.delete()) { call.reject("The file could not be deleted"); return; }
+            }
+            try { cr.delete(uri, null, null); } catch (Exception ignored) {}
+            if (p != null) scan(p);
+            call.resolve(outcome(true, false));
+        } catch (Exception e) {
+            call.reject("Could not delete: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void renameMedia(PluginCall call) {
+        final Uri uri = mediaUri(call.getString("uri"));
+        final String path = call.getString("path");
+        final String name = call.getString("name");
+        if (name == null || name.trim().isEmpty() || name.contains("/")) { call.reject("Invalid name"); return; }
+        try {
+            if (uri != null && Build.VERSION.SDK_INT >= 29) {
+                // Renaming through MediaStore keeps the file's library entry (and its watch history).
+                try {
+                    storeRename(call, uri, name);
+                } catch (RecoverableSecurityException e) {
+                    askUser(call, e.getUserAction().getActionIntent().getIntentSender(), () -> retryStoreRename(call, uri, name));
+                } catch (SecurityException e) {
+                    if (Build.VERSION.SDK_INT < 30) throw e;
+                    PendingIntent pi = MediaStore.createWriteRequest(getContext().getContentResolver(), Collections.singletonList(uri));
+                    askUser(call, pi.getIntentSender(), () -> retryStoreRename(call, uri, name));
+                }
+                return;
+            }
+            if (path != null && hasAllFiles()) { fileRename(call, path, name); return; }
+            if (uri == null) { call.reject("This file can't be renamed from Open Player"); return; }
+            if (getPermissionState("write") != PermissionState.GRANTED) {
+                requestPermissionForAlias("write", call, "writeCallback");
+                return;
+            }
+            String p = path != null ? path : pathOf(uri);
+            if (p == null) { call.reject("File not found"); return; }
+            fileRename(call, p, name);
+        } catch (Exception e) {
+            call.reject("Could not rename: " + e.getMessage());
+        }
+    }
+
+    private void retryStoreRename(PluginCall call, Uri uri, String name) {
+        try {
+            storeRename(call, uri, name);
+        } catch (Exception e) {
+            call.reject("Could not rename: " + e.getMessage());
+        }
+    }
+
+    private void storeRename(PluginCall call, Uri uri, String name) {
+        String oldPath = pathOf(uri);
+        if (oldPath != null) {
+            File parent = new File(oldPath).getParentFile();
+            if (parent != null && new File(parent, name).exists()) { call.reject("A file with that name already exists"); return; }
+        }
+        ContentValues v = new ContentValues();
+        v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+        int n = getContext().getContentResolver().update(uri, v, null, null);
+        if (n == 0) throw new IllegalStateException("nothing was renamed");
+        JSObject r = outcome(true, false);
+        r.put("name", name);
+        r.put("path", pathOf(uri));
+        call.resolve(r);
+    }
+
+    private void fileRename(PluginCall call, String path, String name) {
+        File f = new File(path);
+        File t = new File(f.getParentFile(), name);
+        if (t.exists()) { call.reject("A file with that name already exists"); return; }
+        if (!f.renameTo(t)) { call.reject("The file could not be renamed"); return; }
+        scan(path, t.getAbsolutePath());
+        JSObject r = outcome(true, false);
+        r.put("name", name);
+        r.put("path", t.getAbsolutePath());
+        call.resolve(r);
+    }
+
+    @PermissionCallback
+    private void writeCallback(PluginCall call) {
+        if (getPermissionState("write") != PermissionState.GRANTED) {
+            call.reject("Storage permission is needed to change files");
+            return;
+        }
+        if ("renameMedia".equals(call.getMethodName())) renameMedia(call);
+        else deleteMedia(call);
+    }
+
+    /* ---------------- headphones ---------------- */
+
+    private static boolean isHeadphone(int type) {
+        return type == AudioDeviceInfo.TYPE_WIRED_HEADSET
+            || type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
+            || type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP
+            || type == AudioDeviceInfo.TYPE_USB_HEADSET
+            || type == 26; // AudioDeviceInfo.TYPE_BLE_HEADSET (Android 12+)
+    }
+
+    private void notifyHeadphones(boolean connected) {
+        JSObject o = new JSObject();
+        o.put("connected", connected);
+        notifyListeners("headphones", o);
+    }
+
+    private void watchHeadphones() {
+        Context ctx = getContext();
+        // Unplugged / Bluetooth dropped: Android's "audio becoming noisy" broadcast.
+        noisyReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, Intent i) {
+                if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(i.getAction())) notifyHeadphones(false);
+            }
+        };
+        ContextCompat.registerReceiver(ctx, noisyReceiver,
+            new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED);
+
+        // Plugged in / connected: watch for new headphone outputs (ignore ones already there).
+        AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        for (AudioDeviceInfo d : am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) knownOutputs.add(d.getId());
+        deviceCallback = new AudioDeviceCallback() {
+            @Override
+            public void onAudioDevicesAdded(AudioDeviceInfo[] added) {
+                boolean headphones = false;
+                for (AudioDeviceInfo d : added) {
+                    if (d.isSink() && knownOutputs.add(d.getId()) && isHeadphone(d.getType())) headphones = true;
+                }
+                if (headphones) notifyHeadphones(true);
+            }
+
+            @Override
+            public void onAudioDevicesRemoved(AudioDeviceInfo[] removed) {
+                for (AudioDeviceInfo d : removed) knownOutputs.remove(d.getId());
+            }
+        };
+        am.registerAudioDeviceCallback(deviceCallback, new Handler(Looper.getMainLooper()));
     }
 
     /* ---------------- listing ---------------- */

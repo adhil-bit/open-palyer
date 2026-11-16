@@ -45,13 +45,13 @@ jobs:
         working-directory: android
         env:
           VERSION_CODE: ${{ github.run_number }}
-          VERSION_NAME: 1.2.${{ github.run_number }}
+          VERSION_NAME: 1.4.${{ github.run_number }}
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk OpenPlayer-1.2.${{ github.run_number }}.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OpenPlayer-1.4.${{ github.run_number }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
@@ -61,12 +61,12 @@ jobs:
       - name: Publish to Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.${{ github.run_number }}
-          name: Open Player 1.2.${{ github.run_number }}
+          tag_name: v1.4.${{ github.run_number }}
+          name: Open Player 1.4.${{ github.run_number }}
           make_latest: true
           files: OpenPlayer-*.apk
           body: |
-            **Install:** download `OpenPlayer-1.2.${{ github.run_number }}.apk` on your phone and open it.
+            **Install:** download `OpenPlayer-1.4.${{ github.run_number }}.apk` on your phone and open it.
             Android will ask to allow installs from your browser or file manager — allow it once.
 
             No ads. No tracking. Your videos and music never leave your phone.
