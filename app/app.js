@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.7.2';
 // The website's download section: the APK link there comes with its checksum and signing fingerprint.
 const ANDROID_APK_URL = new URL('../#download', location.href).href;
 const VERIFY_URL = new URL('../#verify', location.href).href;
@@ -1080,12 +1080,17 @@ function onError() {
   if (!P.v.isNative && (code === 3 || code === 4) && canGoNative(P.item)) return switchEngine('native', 'Opening with the all-formats player…');
   if (P.v.isNative) return ptoast(`Couldn’t play this file${P.v.error?.message ? ' · ' + P.v.error.message.slice(0, 80) : ''}`, null, null, 6000);
   if (code === 4 && !NATIVE) {
-    const mkv = /\.(mkv|avi|flv|ts|m2ts|mts|vob|wmv|divx|mpe?g)$/i.test(P.item?.name || '');
-    const why = mkv ? 'Your browser can’t decode this file. Files like this usually use HEVC (x265) video or AC3/DTS sound, which browsers don’t play.'
-      : 'Your browser can’t decode this file’s video or sound.';
-    return IS_ANDROID_BROWSER
-      ? ptoast(why + ' The Android app plays it.', 'Get the app', () => window.open(ANDROID_APK_URL, '_blank', 'noopener'), 10000)
-      : ptoast(why + ' The Open Player desktop app for Linux, Windows and Mac plays it.', 'Get it', () => window.open(new URL('../#desktop', location.href).href, '_blank', 'noopener'), 12000);
+    const it = P.item;
+    sniffCodecs(it).then(c => {
+      if (P.item !== it) return;
+      const parts = [c.video && `${c.video} video`, c.audio && `${c.audio} sound`].filter(Boolean);
+      const why = parts.length
+        ? `This file has ${parts.join(' and ')}, which ${userOS === 'linux' ? 'Chrome and Firefox on Linux' : 'this browser'} can’t play.`
+        : 'This browser can’t decode this file’s video or sound.';
+      if (IS_ANDROID_BROWSER) return ptoast(why + ' The Android app plays it.', 'Get the app', () => window.open(ANDROID_APK_URL, '_blank', 'noopener'), 15000);
+      ptoast(why + ' The Open Player desktop app plays it.', 'Get it', () => sheetGetApp(), 15000);
+    });
+    return;
   }
   if ((code === 3 || code === 4) && NATIVE && P.item && !P.item.native) {
     return ptoast('This copy was added the old way. Add it again with ＋ › Pick videos to play it with the all-formats player.', 'Pick videos', () => { closePlayer(); pickNative(); }, 10000);
@@ -3437,3 +3442,19 @@ function sheetGetApp() {
   };
 }
 if (!NATIVE && !DESK) { $('#btnGet').hidden = false; $('#btnGet').onclick = sheetGetApp; }
+
+/* Reads the start of a video file to name its codecs, so playback errors can say exactly why. */
+async function sniffCodecs(it) {
+  const out = { video: '', audio: '' };
+  try {
+    const blob = it?.file; if (!blob) return out;
+    const head = new Uint8Array(await blob.slice(0, 2 * 1024 * 1024).arrayBuffer());
+    let txt = ''; for (let i = 0; i < head.length; i++) { const c = head[i]; txt += c >= 32 && c < 127 ? String.fromCharCode(c) : ' '; }
+    const V = [['V_MPEGH/ISO/HEVC', 'HEVC (x265)'], ['hvc1', 'HEVC (x265)'], ['hev1', 'HEVC (x265)'], ['V_MPEG4/ISO/AVC', ''], ['V_MPEG4/ISO/ASP', 'MPEG-4 (DivX/Xvid)'], ['V_MS/VFW/FOURCC', 'AVI-style'],
+      ['V_MPEG2', 'MPEG-2'], ['V_REAL', 'RealVideo'], ['XVID', 'Xvid'], ['DIVX', 'DivX'], ['DX50', 'DivX']];
+    const A = [['A_TRUEHD', 'Dolby TrueHD'], ['A_EAC3', 'Dolby Digital Plus (E-AC3)'], ['A_AC3', 'Dolby Digital (AC3)'], ['A_DTS', 'DTS'], ['ac-3', 'Dolby Digital (AC3)'], ['ec-3', 'Dolby Digital Plus (E-AC3)']];
+    out.video = (V.find(([k]) => txt.includes(k)) || [, ''])[1];
+    out.audio = (A.find(([k]) => txt.includes(k)) || [, ''])[1];
+  } catch {}
+  return out;
+}
