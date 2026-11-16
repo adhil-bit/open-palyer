@@ -120,3 +120,56 @@ Installed apps will show "A new version is ready — Reload". Users can also for
 | `android/` | Android app (Capacitor); native media code in `MediaLibraryPlugin.java` |
 | `scripts/build-www.mjs` | Copies the web app into the Android build |
 | `.github/workflows/android.yml` | Builds the APK and publishes it to Releases |
+
+
+## Releases and verification
+
+Every push to `main` runs **Android build & release** (`.github/workflows/android.yml`), which:
+
+1. Builds the APK (full edition) and, if the Play upload key is set up, the Google Play bundle (`.aab`).
+2. Works out the APK's **SHA-256 checksum** and **signing certificate SHA-256 fingerprint**, and writes `SHA256SUMS.txt`.
+3. Creates a **GitHub build attestation**, proof that the APK was built by GitHub Actions from that exact commit. GitHub offers this for public repositories (private ones need GitHub Enterprise Cloud), so the step is skipped until the repo is public.
+4. Uploads the APK to **VirusTotal** and waits for the result (needs the `VT_API_KEY` secret).
+5. Publishes a GitHub Release whose notes list all of the above, plus `release.json` with the same details.
+6. Deploys the website with the APK at `download/OpenPlayer.apk` and `release.json` next to it. The landing page's **Check your download** section and download buttons read from it.
+
+Users can compare the fingerprint with **Settings → About → Verify app** inside the Android app.
+
+### One-time setup
+
+| What | Where | Why |
+|---|---|---|
+| `VT_API_KEY` secret | Settings → Secrets and variables → Actions | Free key from your VirusTotal account (profile → API key). Without it the scan is skipped. |
+| Pages source: **GitHub Actions** | Settings → Pages | The workflow deploys the site itself. Pages on a private repo needs a paid GitHub plan. |
+| Make the repo public | Settings → General → Danger Zone | Needed for attestations, free Pages, and for anyone to see the Releases page. **Move the signing key first** (below). |
+
+### Signing key
+
+The APK is signed with `android/app/openplayer-debug.keystore`, which is in this repo so that every build installs over the previous one. **Before the repo becomes public, replace it with a private key kept in GitHub Secrets**, or anyone could sign a fake update. Changing the key changes the fingerprint, and people then have to uninstall once before installing the new version.
+
+## Google Play edition
+
+The app has two editions (Gradle flavors):
+
+| | `full` (direct APK) | `play` (Google Play) |
+|---|---|---|
+| Find videos in hidden folders ("All files access") | Yes | No. Google Play only allows that permission for file managers, backup apps and similar. |
+| Everything else | Yes | Yes |
+| Built as | `OpenPlayer-x.y.z.apk` | `OpenPlayer-x.y.z-play.aab` (upload to Play Console) |
+
+To get the `.aab` from the workflow, create a Play **upload key** once and add it as secrets:
+
+```bash
+keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 upload.jks > upload.jks.b64      # Mac: base64 -i upload.jks -o upload.jks.b64
+```
+
+Add these repository secrets: `UPLOAD_KEYSTORE_BASE64` (contents of `upload.jks.b64`), `UPLOAD_KEYSTORE_PASSWORD`, `UPLOAD_KEY_ALIAS` (`upload`), `UPLOAD_KEY_PASSWORD`. Keep `upload.jks` somewhere safe and **don't commit it**. With Play App Signing, Google keeps the real app-signing key, and a lost upload key can be reset through Play support.
+
+In Play Console you'll also need:
+- **Testing:** new personal developer accounts must run a closed test with 12 testers for 14 days before production.
+- **Photo and video permissions:** declare that playing the user's videos and music is the app's core purpose (for `READ_MEDIA_VIDEO` / `READ_MEDIA_AUDIO`).
+- **Data safety:** no data collected or shared.
+- **Privacy policy URL:** the landing page's `#privacy` section.
+
+The Play edition uses the same app ID as the APK, but Google re-signs it. Someone who installed the direct APK has to uninstall it before installing from Play.

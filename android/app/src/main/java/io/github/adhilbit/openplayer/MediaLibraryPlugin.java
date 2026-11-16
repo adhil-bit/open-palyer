@@ -14,6 +14,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -58,6 +61,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -172,6 +177,16 @@ public class MediaLibraryPlugin extends Plugin {
 
     /* ---------------- "All files access" for hidden folders ---------------- */
 
+    private boolean declaresAllFiles() {
+        try {
+            String[] req = getContext().getPackageManager()
+                .getPackageInfo(getContext().getPackageName(), PackageManager.GET_PERMISSIONS).requestedPermissions;
+            return req != null && Arrays.asList(req).contains("android.permission.MANAGE_EXTERNAL_STORAGE");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private boolean hasAllFiles() {
         if (Build.VERSION.SDK_INT >= 30) return Environment.isExternalStorageManager();
         return getPermissionState("storage") == PermissionState.GRANTED;
@@ -186,6 +201,7 @@ public class MediaLibraryPlugin extends Plugin {
 
     @PluginMethod
     public void requestAllFiles(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= 30 && !declaresAllFiles()) { call.reject("Not available in this version"); return; }
         if (Build.VERSION.SDK_INT < 30) {
             requestPermissionForAliases(new String[] { "storage" }, call, "allFilesCallback");
             return;
@@ -262,6 +278,57 @@ public class MediaLibraryPlugin extends Plugin {
             o.put("hidden", hidden || name.startsWith("."));
             out.put(o);
             count[0]++;
+        }
+    }
+
+    /* ---------------- about this app (for "Verify this app") ---------------- */
+
+    @PluginMethod
+    public void getAppInfo(PluginCall call) {
+        JSObject r = new JSObject();
+        try {
+            PackageManager pm = getContext().getPackageManager();
+            String pkg = getContext().getPackageName();
+            PackageInfo pi;
+            Signature[] sigs = null;
+            if (Build.VERSION.SDK_INT >= 28) {
+                pi = pm.getPackageInfo(pkg, PackageManager.GET_SIGNING_CERTIFICATES | PackageManager.GET_PERMISSIONS);
+                if (pi.signingInfo != null) {
+                    if (pi.signingInfo.hasMultipleSigners()) sigs = pi.signingInfo.getApkContentsSigners();
+                    else {
+                        Signature[] h = pi.signingInfo.getSigningCertificateHistory();
+                        if (h != null && h.length > 0) sigs = new Signature[] { h[h.length - 1] };   // current key is last
+                    }
+                }
+                r.put("versionCode", pi.getLongVersionCode());
+            } else {
+                pi = pm.getPackageInfo(pkg, PackageManager.GET_SIGNATURES | PackageManager.GET_PERMISSIONS);
+                sigs = pi.signatures;
+                r.put("versionCode", pi.versionCode);
+            }
+            r.put("packageName", pkg);
+            r.put("versionName", pi.versionName);
+            if (sigs != null && sigs.length > 0) {
+                byte[] d = MessageDigest.getInstance("SHA-256").digest(sigs[0].toByteArray());
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < d.length; i++) {
+                    if (i > 0) sb.append(':');
+                    sb.append(String.format("%02X", d[i] & 0xff));
+                }
+                r.put("certSha256", sb.toString());
+            }
+            boolean allFiles = pi.requestedPermissions != null
+                && Arrays.asList(pi.requestedPermissions).contains("android.permission.MANAGE_EXTERNAL_STORAGE");
+            r.put("allFilesSupported", allFiles);   // false in the Google Play version
+            String installer = null;
+            try {
+                if (Build.VERSION.SDK_INT >= 30) installer = pm.getInstallSourceInfo(pkg).getInstallingPackageName();
+                else installer = pm.getInstallerPackageName(pkg);
+            } catch (Exception ignored) {}
+            r.put("installer", installer);
+            call.resolve(r);
+        } catch (Exception e) {
+            call.reject("Could not read app info: " + e.getMessage());
         }
     }
 

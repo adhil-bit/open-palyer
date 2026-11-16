@@ -1,8 +1,11 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.4.0';
-const ANDROID_APK_URL = 'https://github.com/adhil-bit/open-palyer/releases/latest';
+const APP_VERSION = '1.5.0';
+// The website's download section: the APK link there comes with its checksum and signing fingerprint.
+const ANDROID_APK_URL = new URL('../#download', location.href).href;
+const VERIFY_URL = new URL('../#verify', location.href).href;
+const SITE_VERIFY_URL = 'https://adhil-bit.github.io/open-palyer/#verify';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -598,7 +601,7 @@ async function sheetSettings() {
   const mediaSection = NATIVE ? `
     <div class="group">Your media</div>
     ${opt('access', 'i-folder', 'Show all videos &amp; music<small>Lets Open Player list everything on your phone</small>', `<span class="val">${accessLbl}</span>`)}
-    ${opt('deep', 'i-search', 'Find videos in hidden folders<small>Folders apps hide from players (.nomedia). Needs “All files access”.</small>', sw(S.deepScan && allFiles))}
+    ${appInfo?.allFilesSupported === false ? '' : opt('deep', 'i-search', 'Find videos in hidden folders<small>Folders apps hide from players (.nomedia). Needs “All files access”.</small>', sw(S.deepScan && allFiles))}
     ${opt('rescan', 'i-refresh', 'Rescan phone now')}
     ${opt('tghelp', 'i-info', 'Telegram / Plus downloads not showing?')}`
     : `
@@ -627,7 +630,10 @@ async function sheetSettings() {
     ${opt('clearThumbs', 'i-trash', 'Clear thumbnail cache<small>Thumbnails are rebuilt next time</small>')}
     ${opt('clearHistory', 'i-trash', 'Clear watch history<small>Resume points and Recent list</small>', '', 'danger')}
     <div class="group">About</div>
-    ${opt('update', 'i-info', `Open Player ${APP_VERSION}<small>No ads. No tracking. Your videos never leave this device.</small>`, '<span class="val">Check for update</span>')}`;
+    ${NATIVE
+      ? opt('verify', 'i-info', `Open Player ${esc(appInfo?.versionName || APP_VERSION)}<small>No ads. No tracking. Your videos never leave this device.</small>`, '<span class="val">Verify app</span>')
+      : opt('update', 'i-info', `Open Player ${APP_VERSION}<small>No ads. No tracking. Your videos never leave this device.</small>`, '<span class="val">Check for update</span>') +
+        opt('verifyweb', 'i-android', 'Verify the Android download<small>Checksum, signing fingerprint and virus scan</small>')}`;
   const b = openSheet('Settings', draw(await storageInfo()));
   const redraw = async () => { const sc = sheet.scrollTop; b.innerHTML = draw(await storageInfo()); sheet.scrollTop = sc; };
   b.onclick = async e => {
@@ -660,6 +666,8 @@ async function sheetSettings() {
       recents = []; store.del('progress'); store.del('recents'); render(); snack('Watch history cleared');
     }
     if (o === 'update') { closeSheet(); return checkForUpdate(true); }
+    if (o === 'verify') { closeSheet(); return sheetVerifyApp(); }
+    if (o === 'verifyweb') { window.open(VERIFY_URL, '_blank', 'noopener'); return; }
     if (o === 'access') {
       if (hasAccess('video') || hasAccess('audio')) { closeSheet(); return snack('Access is on. To turn it off, use Android settings.', 'Open', () => ML.openAppSettings(), 5000); }
       closeSheet(); return requestMediaAccess();
@@ -1946,6 +1954,32 @@ function sheetTelegramHelp() {
     };
 }
 
+/* about this install: version, signing certificate, Play or direct download */
+let appInfo = null;
+async function loadAppInfo() {
+  if (!NATIVE) return;
+  try { appInfo = await ML.getAppInfo(); } catch { appInfo = null; }
+  if (appInfo?.allFilesSupported === false && S.deepScan) { S.deepScan = false; saveSettings(); }
+}
+function sheetVerifyApp() {
+  const i = appInfo || {};
+  const from = i.installer === 'com.android.vending' ? 'Google Play' : 'Downloaded APK';
+  const b = openSheet('Verify this app', `
+    <p class="sheet-note">Every official Open Player build is signed with the same key. If the fingerprint below matches the one on the Open Player website, this copy is genuine and hasn’t been changed.</p>
+    <div class="kv"><span>Version</span><b>${esc(i.versionName || APP_VERSION)}${i.versionCode ? ` (${esc(i.versionCode)})` : ''}</b></div>
+    <div class="kv"><span>Edition</span><b>${i.allFilesSupported === false ? 'Google Play edition' : 'Full edition (direct download)'}</b></div>
+    <div class="kv"><span>Installed from</span><b>${from}</b></div>
+    <div class="kv col"><span>Signing certificate SHA-256</span><code id="certFp">${esc(i.certSha256 || 'Not available')}</code></div>
+    ${i.installer === 'com.android.vending' ? '<p class="sheet-note">Apps from Google Play are re-signed by Google, so their fingerprint differs from the direct download. Play has already checked this copy.</p>' : ''}
+    ${opt('copy', 'i-check', 'Copy fingerprint')}
+    ${opt('site', 'i-info', 'Compare on the Open Player website')}`);
+  b.onclick = async e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    if (o === 'copy') { try { await navigator.clipboard.writeText(i.certSha256 || ''); snack('Fingerprint copied'); } catch { snack('Couldn’t copy — long-press the fingerprint instead'); } }
+    if (o === 'site') window.open(SITE_VERIFY_URL, '_blank', 'noopener');
+  };
+}
+
 /* files opened from other apps ("Open with" / Share → Open Player) */
 function handleOpenFile(f) {
   if (!f?.uri) return;
@@ -2716,6 +2750,7 @@ setupSW();
 importShared();
 (async () => {
   if (NATIVE) {
+    await loadAppInfo();
     await refreshAccess();
     if (hasAccess('video') || hasAccess('audio')) { S.onboarded = true; saveSettings(); scanDevice(true); }
     try { const r = await ML.getLaunchFile(); if (r.file) handleOpenFile(r.file); } catch {}

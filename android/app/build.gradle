@@ -9,7 +9,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI passes the build number so every APK can install over the previous one.
         versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
-        versionName System.getenv("VERSION_NAME") ?: "1.4.0"
+        versionName System.getenv("VERSION_NAME") ?: "1.5.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -17,14 +17,32 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // A fixed key so every new APK installs over the last one.
-    // For a Play Store release, replace this with a private key kept in GitHub Secrets.
+    // Two versions of the app:
+    //   full - the APK on GitHub / the website. Includes "All files access" to find videos in hidden folders.
+    //   play - for Google Play, whose policy doesn't allow "All files access" for video players.
+    flavorDimensions "store"
+    productFlavors {
+        full { dimension "store" }
+        play { dimension "store" }
+    }
     signingConfigs {
+        // A fixed key so every new APK installs over the last one.
+        // Move this to a private key in GitHub Secrets before the repo goes public.
         debug {
             storeFile file('openplayer-debug.keystore')
             storePassword 'openplayer'
             keyAlias 'openplayer'
             keyPassword 'openplayer'
+        }
+        // Google Play "upload key". Only used when the CI secrets are set (see README).
+        upload {
+            def ks = System.getenv("UPLOAD_KEYSTORE")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("UPLOAD_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("UPLOAD_KEY_ALIAS")
+                keyPassword System.getenv("UPLOAD_KEY_PASSWORD")
+            }
         }
     }
     buildTypes {
@@ -34,6 +52,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (System.getenv("UPLOAD_KEYSTORE")) signingConfig signingConfigs.upload
         }
     }
 }

@@ -1,4 +1,4 @@
-name: Android APK
+name: Android build & release
 
 on:
   push:
@@ -6,15 +6,24 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write      # create the GitHub Release
+  id-token: write      # sign the build attestation / deploy Pages
+  attestations: write  # store the build attestation
+  pages: write         # publish the website
 
 concurrency:
   group: android-apk
   cancel-in-progress: true
 
+env:
+  APP_VER: "1.5"
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # true when the Google Play upload key has been added as repository secrets (see README)
+      HAS_UPLOAD_KEY: ${{ secrets.UPLOAD_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -33,6 +42,10 @@ jobs:
       - name: Android SDK licenses
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
+      - name: Version
+        id: ver
+        run: echo "version=${APP_VER}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
       - name: Install
         run: npm ci
 
@@ -41,32 +54,223 @@ jobs:
           npm run build:www
           npx cap sync android
 
-      - name: Build APK
+      - name: Build the APK (direct download, full edition)
         working-directory: android
         env:
           VERSION_CODE: ${{ github.run_number }}
-          VERSION_NAME: 1.4.${{ github.run_number }}
+          VERSION_NAME: ${{ steps.ver.outputs.version }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleFullDebug --no-daemon --stacktrace
 
-      - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk OpenPlayer-1.4.${{ github.run_number }}.apk
+      - name: Build the Google Play bundle (when the upload key is set up)
+        if: env.HAS_UPLOAD_KEY == 'true'
+        working-directory: android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: ${{ steps.ver.outputs.version }}
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+        run: |
+          echo "$UPLOAD_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          export UPLOAD_KEYSTORE="$RUNNER_TEMP/upload.jks"
+          ./gradlew bundlePlayRelease --no-daemon --stacktrace
+          rm -f "$RUNNER_TEMP/upload.jks"
 
-      - uses: actions/upload-artifact@v4
+      - name: Collect release files
+        env:
+          V: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/full/debug/app-full-debug.apk "dist/OpenPlayer-$V.apk"
+          AAB=android/app/build/outputs/bundle/playRelease/app-play-release.aab
+          if [ -f "$AAB" ]; then cp "$AAB" "dist/OpenPlayer-$V-play.aab"; fi
+          ls -l dist
+
+      - name: Checksums and signing certificate
+        id: verify
+        env:
+          V: ${{ steps.ver.outputs.version }}
+        run: |
+          APK="dist/OpenPlayer-$V.apk"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          CERT=$("$BT/apksigner" verify --print-certs "$APK" | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}' \
+            | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          (cd dist && ls OpenPlayer-* | xargs sha256sum > SHA256SUMS.txt)
+          {
+            echo "sha256=$SHA"
+            echo "cert=$CERT"
+            echo "size=$(stat -c %s "$APK")"
+          } >> "$GITHUB_OUTPUT"
+          echo "APK SHA-256: $SHA"
+          echo "Signing certificate SHA-256: $CERT"
+
+      # Proves the APK was built by GitHub Actions from this exact commit.
+      # GitHub offers this for public repositories (private ones need GitHub Enterprise Cloud),
+      # so it is skipped quietly until the repository is public.
+      - name: Build provenance attestation
+        id: attest
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v4
         with:
-          name: OpenPlayer-apk
-          path: OpenPlayer-*.apk
+          subject-path: dist/OpenPlayer-*
+
+      # Needs a free VirusTotal API key saved as the repository secret VT_API_KEY.
+      - name: VirusTotal scan
+        id: vt
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+          V: ${{ steps.ver.outputs.version }}
+          SHA: ${{ steps.verify.outputs.sha256 }}
+        run: |
+          set +e
+          if [ -z "$VT_API_KEY" ]; then
+            echo "VT_API_KEY secret not set: skipping the scan."
+            echo "status=skipped" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          ID=$(curl -sS --fail -H "x-apikey: $VT_API_KEY" -F "file=@dist/OpenPlayer-$V.apk" \
+               https://www.virustotal.com/api/v3/files | jq -r '.data.id')
+          if [ -z "$ID" ] || [ "$ID" = "null" ]; then
+            echo "Upload to VirusTotal failed."
+            echo "status=failed" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "link=https://www.virustotal.com/gui/file/$SHA" >> "$GITHUB_OUTPUT"
+          # The free API allows 4 requests a minute: check every 20 s for up to ~7 minutes.
+          for i in $(seq 1 20); do
+            sleep 20
+            R=$(curl -sS -H "x-apikey: $VT_API_KEY" "https://www.virustotal.com/api/v3/analyses/$ID")
+            if [ "$(echo "$R" | jq -r '.data.attributes.status')" = "completed" ]; then
+              MAL=$(echo "$R" | jq '.data.attributes.stats.malicious + .data.attributes.stats.suspicious')
+              ENG=$(echo "$R" | jq '[.data.attributes.stats | .malicious, .suspicious, .undetected, .harmless] | add')
+              { echo "status=done"; echo "flagged=$MAL"; echo "engines=$ENG"; } >> "$GITHUB_OUTPUT"
+              echo "VirusTotal: $MAL of $ENG engines flagged the APK"
+              exit 0
+            fi
+          done
+          echo "status=pending" >> "$GITHUB_OUTPUT"
+          echo "VirusTotal is still scanning; the report link will show the result."
+
+      - name: Release info for the website
+        env:
+          V: ${{ steps.ver.outputs.version }}
+          SHA: ${{ steps.verify.outputs.sha256 }}
+          CERT: ${{ steps.verify.outputs.cert }}
+          SIZE: ${{ steps.verify.outputs.size }}
+          VT_STATUS: ${{ steps.vt.outputs.status }}
+          VT_LINK: ${{ steps.vt.outputs.link }}
+          VT_FLAGGED: ${{ steps.vt.outputs.flagged }}
+          VT_ENGINES: ${{ steps.vt.outputs.engines }}
+          ATTEST_URL: ${{ steps.attest.outputs.attestation-url }}
+        run: |
+          jq -n \
+            --arg version "$V" --arg apk "OpenPlayer-$V.apk" --arg sha256 "$SHA" --arg cert "$CERT" \
+            --arg size "$SIZE" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg vtStatus "$VT_STATUS" --arg vtLink "$VT_LINK" --arg vtFlagged "$VT_FLAGGED" --arg vtEngines "$VT_ENGINES" \
+            --arg attestation "$ATTEST_URL" \
+            --arg release "https://github.com/${{ github.repository }}/releases/tag/v$V" --arg commit "${{ github.sha }}" \
+            '{ version: $version, apk: $apk, download: "download/OpenPlayer.apk", size: ($size | tonumber? // null),
+               sha256: $sha256, certSha256: $cert, date: $date,
+               virustotal: { status: $vtStatus, link: $vtLink,
+                             flagged: ($vtFlagged | tonumber? // null), engines: ($vtEngines | tonumber? // null) },
+               attestation: $attestation, release: $release, commit: $commit }' > dist/release.json
+          cat dist/release.json
+
+      - name: Release notes
+        env:
+          V: ${{ steps.ver.outputs.version }}
+          SHA: ${{ steps.verify.outputs.sha256 }}
+          CERT: ${{ steps.verify.outputs.cert }}
+          VT_STATUS: ${{ steps.vt.outputs.status }}
+          VT_LINK: ${{ steps.vt.outputs.link }}
+          VT_FLAGGED: ${{ steps.vt.outputs.flagged }}
+          VT_ENGINES: ${{ steps.vt.outputs.engines }}
+          ATTEST_URL: ${{ steps.attest.outputs.attestation-url }}
+        run: |
+          case "$VT_STATUS" in
+            done)    VT="[$VT_FLAGGED of $VT_ENGINES security engines flagged it]($VT_LINK)" ;;
+            pending) VT="[Scan report]($VT_LINK) (still scanning when this release was made)" ;;
+            *)       VT="Not scanned for this release" ;;
+          esac
+          if [ -n "$ATTEST_URL" ]; then PROV="[GitHub build attestation]($ATTEST_URL)"; else PROV="Available once the source code is public"; fi
+          AAB_NOTE=""
+          if [ -f "dist/OpenPlayer-$V-play.aab" ]; then AAB_NOTE="- \`OpenPlayer-$V-play.aab\`: Google Play edition, for uploading in Play Console (not for installing)."; fi
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          **Install:** download \`OpenPlayer-$V.apk\` on your phone and open it. Android asks once to allow installs from your browser or file manager.
+
+          No ads. No tracking. Your videos and music never leave your phone.
+
+          ### Check this download is genuine
+
+          | | |
+          |---|---|
+          | APK SHA-256 | \`$SHA\` |
+          | Signing certificate SHA-256 | \`$CERT\` |
+          | Virus scan (VirusTotal) | $VT |
+          | Build provenance | $PROV |
+
+          Check the file before installing:
+          - Windows: \`certutil -hashfile OpenPlayer-$V.apk SHA256\`
+          - Mac: \`shasum -a 256 OpenPlayer-$V.apk\`
+          - Linux: \`sha256sum OpenPlayer-$V.apk\`
+
+          After installing, **Settings → About → Verify app** shows the signing fingerprint. It must match the one above.
+
+          ### Files
+          - \`OpenPlayer-$V.apk\`: install this on your phone.
+          - \`SHA256SUMS.txt\`, \`release.json\`: checksums and release details.
+          $AAB_NOTE
+          EOF
+          sed -i 's/^          //' "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: OpenPlayer-${{ steps.ver.outputs.version }}
+          path: |
+            dist/OpenPlayer-*
+            dist/SHA256SUMS.txt
+            dist/release.json
 
       - name: Publish to Releases
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          tag_name: v1.4.${{ github.run_number }}
-          name: Open Player 1.4.${{ github.run_number }}
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: Open Player ${{ steps.ver.outputs.version }}
           make_latest: true
-          files: OpenPlayer-*.apk
-          body: |
-            **Install:** download `OpenPlayer-1.4.${{ github.run_number }}.apk` on your phone and open it.
-            Android will ask to allow installs from your browser or file manager — allow it once.
+          body_path: ${{ runner.temp }}/notes.md
+          files: |
+            dist/OpenPlayer-*
+            dist/SHA256SUMS.txt
+            dist/release.json
 
-            No ads. No tracking. Your videos and music never leave your phone.
+      # The website, with the APK and its verification details next to it.
+      - name: Prepare the website
+        env:
+          V: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir -p site/download
+          cp -r index.html sw.js app .nojekyll site/
+          cp dist/release.json site/
+          cp "dist/OpenPlayer-$V.apk" site/download/OpenPlayer.apk
+          cp dist/SHA256SUMS.txt site/download/
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+          include-hidden-files: true
+
+  # Needs: Settings → Pages → Source: "GitHub Actions".
+  # Pages for a private repository needs a paid GitHub plan, so this step may fail until then.
+  website:
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5
