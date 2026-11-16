@@ -537,3 +537,19 @@ body.kids #mini { display: none !important; }
 .icon-btn.getapp { width: auto; gap: 6px; padding: 0 12px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 14px; }
 .icon-btn.getapp svg { width: 18px; height: 18px; }
 @media (max-width: 420px) { .icon-btn.getapp span { display: none; } .icon-btn.getapp { padding: 0 10px; } }
+
+/* friendly playback errors */
+.perr { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.72); }
+.perr-card { width: min(460px, 100%); background: var(--surface); border-radius: 20px; padding: 26px 24px 20px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.perr-ic { width: 60px; height: 60px; margin: 0 auto 14px; border-radius: 18px; display: grid; place-items: center; background: var(--surface-2); color: var(--accent); }
+.perr-ic svg { width: 32px; height: 32px; }
+.perr-ic.warn { color: #ffb020; } .perr-ic.info { color: #6cb4ff; }
+.perr h2 { margin: 0 0 8px; font-size: 20px; }
+.perr p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.perr-tips { text-align: left; margin: 14px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); font-size: 14px; line-height: 1.5; color: var(--muted); }
+.perr-tips:empty { display: none; }
+.perr-tips li { margin: 4px 0 4px 18px; }
+.perr-tips ul { margin: 0; padding: 0; }
+.perr-acts { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 18px; }
+.perr-acts .btn { min-width: 120px; justify-content: center; }
+.perr-acts .btn.link { background: none; color: var(--muted); min-width: 0; }

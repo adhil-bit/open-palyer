@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.7.6';
+const APP_VERSION = '1.7.7';
 // The website's download section: the APK link there comes with its checksum and signing fingerprint.
 const ANDROID_APK_URL = new URL('../#download', location.href).href;
 const VERIFY_URL = new URL('../#verify', location.href).href;
@@ -976,6 +976,7 @@ function loadWith(item, startAt, engine) {
   P.cues = []; P.subDelay = 0; P.subBuf = null; P.subEnc = null; P.subEncForced = null; renderSub();
   P.zoom = 1;
   pvReset(); pvHide();
+  hidePlayError();
   deskDetach();
   if (item.remote && P.boost) freshVideo();
   if (P.v.isNative) P.v.openItem(item, startAt);
@@ -1089,31 +1090,21 @@ function onEnded() {
 }
 function onError() {
   $('#spinner').hidden = true;
-  const code = P.v.error?.code;
-  if (!P.v.isNative && (code === 3 || code === 4) && canGoNative(P.item)) return switchEngine('native', 'Opening with the all-formats player…');
-  if (P.v.isNative) return ptoast(`Couldn’t play this file${P.v.error?.message ? ' · ' + P.v.error.message.slice(0, 80) : ''}`, null, null, 6000);
-  if (code === 4 && !NATIVE) {
-    const it = P.item;
+  const code = P.v.error?.code, it = P.item;
+  if (!P.v.isNative && (code === 3 || code === 4) && canGoNative(it)) return switchEngine('native', 'Opening with the all-formats player…');
+  if (P.v.isNative) return showPlayError(nativeErrorKind(P.v.error?.name), { detail: P.v.error?.message });
+  if (code === 2) return showPlayError('network');
+  if (code === 4 && !NATIVE && !DESK) {
     sniffCodecs(it).then(c => {
       if (P.item !== it) return;
-      if (c.incomplete) return ptoast(INCOMPLETE_MSG, null, null, 15000);
+      if (c.incomplete) return showPlayError('incomplete');
       const parts = [c.video && `${c.video} video`, c.audio && `${c.audio} sound`].filter(Boolean);
-      const why = parts.length
-        ? `This file has ${parts.join(' and ')}, which ${userOS === 'linux' ? 'Chrome and Firefox on Linux' : 'this browser'} can’t play.`
-        : 'This browser can’t decode this file’s video or sound.';
-      if (IS_ANDROID_BROWSER) return ptoast(why + ' The Android app plays it.', 'Get the app', () => window.open(ANDROID_APK_URL, '_blank', 'noopener'), 15000);
-      ptoast(why + (installedPWA()
-        ? ' This installed web app still runs on Chrome’s decoders. Install the Open Player desktop app (.deb) instead; it has its own FFmpeg.'
-        : ' The Open Player desktop app plays it.'), 'Get it', () => sheetGetApp(), 20000);
+      showPlayError('browser', { parts });
     });
     return;
   }
-  if ((code === 3 || code === 4) && NATIVE && P.item && !P.item.native) {
-    return ptoast('This copy was added the old way. Add it again with ＋ › Pick videos to play it with the all-formats player.', 'Pick videos', () => { closePlayer(); pickNative(); }, 10000);
-  }
-  const msg = code === 4 ? 'This file’s format isn’t supported here. MP4 (H.264) and WebM play best.'
-    : code === 2 ? 'Network error while loading the video.' : 'Couldn’t play this video.';
-  ptoast(msg, null, null, 6000);
+  if ((code === 3 || code === 4) && NATIVE && it && !it.native) return showPlayError('oldcopy');
+  showPlayError(code === 4 ? 'unsupported' : 'generic');
 }
 
 function saveProgress(force, finished) {
@@ -1133,7 +1124,7 @@ function closePlayer(fromPop) {
   saveProgress(true);
   const keepMusic = P.item?.kind === 'audio' && !P.v.paused;
   if (!keepMusic) { P.v.pause(); clearSleep(); deskDetach(); }
-  P.el.hidden = true; closeSheet();
+  P.el.hidden = true; closeSheet(); hidePlayError();
   P.loadToken = (P.loadToken || 0) + 1;
   if (P.v.isNative) setEngine('web');
   setLock(false);
@@ -3332,10 +3323,11 @@ function deskModeFor(it) {
   return it.deskProbe && !it.deskProbe.direct ? 'hls' : 'direct';
 }
 function deskDetach() { if (P.hls) { try { P.hls.destroy(); } catch {} P.hls = null; } }
-const INCOMPLETE_MSG = 'This file isn’t fully downloaded yet: its beginning is still empty. Let the download (or torrent) finish, then play it again.';
 function deskAttach(it) {
   const info = it.deskProbe || { audio: [], subs: [] };
-  if (info.incomplete) { $('#spinner').hidden = true; ptoast(INCOMPLETE_MSG, null, null, 15000); return; }
+  if (info.incomplete) { $('#spinner').hidden = true; return showPlayError('incomplete'); }
+  if (info.missing) { $('#spinner').hidden = true; return showPlayError('missing'); }
+  if (it.deskProbe && !info.duration && !info.video && !info.audio.length) { $('#spinner').hidden = true; return showPlayError('damaged'); }
   const aIdx = P.deskAudio[it.id] ?? Math.max(0, info.audio.findIndex(a => a.def));
   P.deskTracks = [
     ...info.audio.map((a, i) => ({ type: 'audio', group: i, track: 0, label: a.title, language: a.language, codec: a.codec, channels: a.channels, selected: i === aIdx, supported: true })),
@@ -3355,7 +3347,7 @@ function deskAttach(it) {
       }
       $('#spinner').hidden = true;
       P.deskErr = `${d.type} / ${d.details}${d.response?.code ? ' / HTTP ' + d.response.code : ''}${d.reason ? ' / ' + d.reason : ''}`;
-      ptoast('Couldn’t convert this file for playback', 'Details', () => sheetDeskDiag(it), 20000);
+      showPlayError('generic', { details: () => sheetDeskDiag(it) });
     });
   } else P.v.src = DESK.url('file', it.dpath);
   onNativeTracks();
@@ -3500,3 +3492,74 @@ async function sheetDeskDiag(it) {
     <div class="sheet-actions"><button class="btn primary" data-a="copy">Copy details</button></div>`);
   b.onclick = async e => { if (!e.target.closest('[data-a="copy"]')) return; try { await navigator.clipboard.writeText(text); snack('Copied'); } catch { snack('Select the text and copy it'); } };
 }
+
+/* ---------- friendly playback errors: what happened, and what to do ---------- */
+const ERR_ICONS = {
+  dl: '<svg viewBox="0 0 24 24"><path d="M12 4v10m0 0l-4-4m4 4l4-4M5 19.5h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  film: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 5v14M16 5v14M3 9.5h5M3 14.5h5M16 9.5h5M16 14.5h5" stroke="currentColor" stroke-width="1.6"/></svg>',
+  broken: '<svg viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2-2 2 2 2M13 12l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  wifi: '<svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.7 16a5 5 0 0 1 6.6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="19.5" r="1.4" fill="currentColor"/></svg>',
+  alert: '<svg viewBox="0 0 24 24"><path d="M12 3l9.5 17h-19z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.2" fill="currentColor"/></svg>',
+};
+function nativeErrorKind(name = '') {
+  if (/FILE_NOT_FOUND|NO_PERMISSION/.test(name)) return 'missing';
+  if (/PARSING_CONTAINER_MALFORMED|PARSING_MANIFEST_MALFORMED|READ_POSITION_OUT_OF_RANGE/.test(name)) return 'damaged';
+  if (/UNSUPPORTED|DECODER_INIT|DECODING_FORMAT/.test(name)) return 'unsupported';
+  if (/IO_NETWORK|BAD_HTTP|TIMEOUT/.test(name)) return 'network';
+  return 'generic';
+}
+function playErrorInfo(kind, o = {}) {
+  const tryAgain = ['Try again', () => { hidePlayError(); if (P.item) { P.item.deskProbe = null; P.item.engineProbe = null; } PV.failed = null; load(P.item); }];
+  const close = ['Close', () => { hidePlayError(); closePlayer(); }];
+  const nextOne = P.idx < P.queue.length - 1 ? ['Play next', () => { hidePlayError(); next(); }] : null;
+  switch (kind) {
+    case 'incomplete': return { icon: 'dl', tone: 'warn', title: 'Download not finished',
+      text: 'This video is still downloading, or its download stopped part-way. The beginning of the file is still empty, so it can’t play yet.',
+      tips: ['Let your download or torrent app reach 100%', 'In a torrent app, use “Force recheck” or “Verify” if it says finished', 'If the download failed, download the video again'],
+      acts: [tryAgain, nextOne, close] };
+    case 'damaged': return { icon: 'broken', tone: 'warn', title: 'This video file is damaged',
+      text: 'Part of the file is missing or broken, so it can’t be read. This usually means the download didn’t complete properly.',
+      tips: ['Download the video again', 'If it came from a torrent, recheck it in your torrent app'],
+      acts: [tryAgain, nextOne, close] };
+    case 'missing': return { icon: 'search', tone: 'info', title: 'Video not found',
+      text: 'This file was moved, renamed or deleted, or the memory card it was on isn’t connected.',
+      tips: [NATIVE ? 'Rescan in Settings › Rescan phone now' : 'Add it again with ＋ › Pick videos'],
+      acts: [nextOne, close] };
+    case 'network': return { icon: 'wifi', tone: 'info', title: 'Couldn’t load the video',
+      text: 'The connection dropped or the link stopped working.', tips: ['Check your internet connection', 'Open the link in a browser to see if it still works'],
+      acts: [tryAgain, close] };
+    case 'browser': {
+      const what = o.parts?.length ? `It uses ${o.parts.join(' and ')}, which ${userOS === 'linux' ? 'Chrome and Firefox on Linux' : 'this browser'} can’t play.` : 'It uses a video or sound format this browser can’t play.';
+      return { icon: 'film', tone: 'accent', title: 'Your browser can’t play this video',
+        text: what + (installedPWA() ? ' The installed web app uses the browser’s player too.' : ''),
+        tips: [IS_ANDROID_BROWSER ? 'The Open Player Android app plays it' : 'The Open Player desktop app plays it: it has its own player built in'],
+        acts: [IS_ANDROID_BROWSER ? ['Get the Android app', () => window.open(ANDROID_APK_URL, '_blank', 'noopener')] : ['Get the desktop app', () => sheetGetApp()], close] };
+    }
+    case 'oldcopy': return { icon: 'film', tone: 'accent', title: 'Add this video again',
+      text: 'This copy was added the old way, so the all-formats player can’t open it.', tips: [],
+      acts: [['Pick videos', () => { hidePlayError(); closePlayer(); pickNative(); }], close] };
+    case 'unsupported': return { icon: 'film', tone: 'accent', title: 'This format isn’t supported',
+      text: 'Open Player can’t decode this video’s picture or sound.', tips: ['Try Player engine › All formats in the ⋮ menu'], acts: [nextOne, close] };
+    default: return { icon: 'alert', tone: 'warn', title: 'Couldn’t play this video',
+      text: 'Something went wrong while opening this file.', tips: [],
+      acts: [tryAgain, o.details ? ['Details', o.details, 'link'] : null, close] };
+  }
+}
+function showPlayError(kind, o = {}) {
+  const info = playErrorInfo(kind, o);
+  P.lastError = kind;
+  $('#spinner').hidden = true;
+  $('#perrIc').className = 'perr-ic ' + (info.tone || '');
+  $('#perrIc').innerHTML = ERR_ICONS[info.icon] || ERR_ICONS.alert;
+  $('#perrTitle').textContent = info.title;
+  $('#perrText').textContent = info.text;
+  $('#perrTips').innerHTML = info.tips?.length ? `<ul>${info.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
+  const acts = info.acts.filter(Boolean);
+  $('#perrActs').innerHTML = acts.map(([l, , cls], i) => `<button class="btn ${cls || (i === 0 ? 'primary' : '')}" data-i="${i}">${esc(l)}</button>`).join('');
+  $('#perrActs').onclick = e => { const b = e.target.closest('[data-i]'); if (b) acts[+b.dataset.i][1](); };
+  $('#perr').hidden = false;
+  $('#ptoast').hidden = true;
+  showControls(true);
+}
+function hidePlayError() { $('#perr').hidden = true; }

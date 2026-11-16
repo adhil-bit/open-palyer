@@ -223,7 +223,7 @@ else {
     // The player asks for files passed on the command line / "Open with" once its library is ready.
     ipcMain.handle('ready', () => { rendererReady = true; return pendingOpen.splice(0); });
     ipcMain.handle('allow', (_e, paths) => { (paths || []).forEach(allow); return true; });
-    ipcMain.handle('probe', async (_e, p) => { allow(p); try { return await probe(p); } catch { return null; } });
+    ipcMain.handle('probe', async (_e, p) => { allow(p); try { return await probe(p); } catch { return fs.existsSync(p) ? null : { missing: true, duration: 0, video: null, audio: [], subs: [] }; } });
     ipcMain.handle('exists', (_e, paths) => (paths || []).filter(p => { try { return fs.statSync(p).isFile(); } catch { return false; } }));
     ipcMain.handle('pick', async () => {
       const r = await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'], filters: [
