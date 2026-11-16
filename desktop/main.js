@@ -55,6 +55,12 @@ async function probe(file) {
   const out = await runFfmpeg(['-hide_banner', '-i', file]);
   if (!/Duration:/.test(out)) note('Probe found no media info: ' + path.basename(file), out);
   const r = { duration: 0, video: null, audio: [], subs: [], size: st.size };
+  // A torrent or download still in progress leaves unwritten parts as zero bytes.
+  try {
+    const fd = fs.openSync(file, 'r'), buf = Buffer.alloc(65536);
+    const n = fs.readSync(fd, buf, 0, buf.length, 0); fs.closeSync(fd);
+    r.incomplete = n > 0 && buf.subarray(0, n).every(x => x === 0);
+  } catch {}
   const d = out.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
   if (d) r.duration = +d[1] * 3600 + +d[2] * 60 + parseFloat(d[3]);
   const lines = out.split(/\r?\n/);

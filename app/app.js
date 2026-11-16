@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.7.5';
+const APP_VERSION = '1.7.6';
 // The website's download section: the APK link there comes with its checksum and signing fingerprint.
 const ANDROID_APK_URL = new URL('../#download', location.href).href;
 const VERIFY_URL = new URL('../#verify', location.href).href;
@@ -1096,6 +1096,7 @@ function onError() {
     const it = P.item;
     sniffCodecs(it).then(c => {
       if (P.item !== it) return;
+      if (c.incomplete) return ptoast(INCOMPLETE_MSG, null, null, 15000);
       const parts = [c.video && `${c.video} video`, c.audio && `${c.audio} sound`].filter(Boolean);
       const why = parts.length
         ? `This file has ${parts.join(' and ')}, which ${userOS === 'linux' ? 'Chrome and Firefox on Linux' : 'this browser'} can’t play.`
@@ -3331,8 +3332,10 @@ function deskModeFor(it) {
   return it.deskProbe && !it.deskProbe.direct ? 'hls' : 'direct';
 }
 function deskDetach() { if (P.hls) { try { P.hls.destroy(); } catch {} P.hls = null; } }
+const INCOMPLETE_MSG = 'This file isn’t fully downloaded yet: its beginning is still empty. Let the download (or torrent) finish, then play it again.';
 function deskAttach(it) {
   const info = it.deskProbe || { audio: [], subs: [] };
+  if (info.incomplete) { $('#spinner').hidden = true; ptoast(INCOMPLETE_MSG, null, null, 15000); return; }
   const aIdx = P.deskAudio[it.id] ?? Math.max(0, info.audio.findIndex(a => a.def));
   P.deskTracks = [
     ...info.audio.map((a, i) => ({ type: 'audio', group: i, track: 0, label: a.title, language: a.language, codec: a.codec, channels: a.channels, selected: i === aIdx, supported: true })),
@@ -3475,6 +3478,7 @@ async function sniffCodecs(it) {
   try {
     const blob = it?.file; if (!blob) return out;
     const head = new Uint8Array(await blob.slice(0, 8 * 1024 * 1024).arrayBuffer());
+    if (head.length && head.subarray(0, 65536).every(x => x === 0)) { out.incomplete = true; return out; }
     let txt = ''; for (let i = 0; i < head.length; i++) { const c = head[i]; txt += c >= 32 && c < 127 ? String.fromCharCode(c) : ' '; }
     const V = [['V_MPEGH/ISO/HEVC', 'HEVC (x265)'], ['hvc1', 'HEVC (x265)'], ['hev1', 'HEVC (x265)'], ['V_MPEG4/ISO/AVC', ''], ['V_MPEG4/ISO/ASP', 'MPEG-4 (DivX/Xvid)'], ['V_MS/VFW/FOURCC', 'AVI-style'],
       ['V_MPEG2', 'MPEG-2'], ['V_REAL', 'RealVideo'], ['XVID', 'Xvid'], ['DIVX', 'DivX'], ['DX50', 'DivX']];
