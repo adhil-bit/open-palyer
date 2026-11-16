@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.6.1';
 // The website's download section: the APK link there comes with its checksum and signing fingerprint.
 const ANDROID_APK_URL = new URL('../#download', location.href).href;
 const VERIFY_URL = new URL('../#verify', location.href).href;
