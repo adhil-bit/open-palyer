@@ -91,6 +91,27 @@
     @media (prefers-reduced-motion: no-preference) { .scrub i { animation: play 2.4s cubic-bezier(.3,.6,.3,1) both .3s; } }
     @keyframes play { from { width: 0; } }
     .adbreaks { white-space: nowrap; }
+    .replay { all: unset; cursor: pointer; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; }
+    .replay:hover { background: var(--line); }
+    .scrub em { position: absolute; top: -2px; width: 5px; height: 8px; margin-left: -2px; border-radius: 2px; background: var(--sub); transform: scaleY(0); transition: transform .25s; }
+    .run .scrub em { transform: none; }
+    .scrub em.gone { transform: scale(2.4, 0) !important; opacity: 0; transition: transform .35s, opacity .35s; }
+    .cue { position: absolute; left: 5%; right: 5%; bottom: 9%; text-align: center; margin: 0; font: 700 clamp(20px, 2.8vw, 36px)/1.25 var(--text);
+      color: #fff; text-shadow: 0 2px 0 #000, 0 0 6px #000; opacity: 0; transition: opacity .25s; }
+    .cue.on { opacity: 1; }
+    .screen h1 { transition: opacity .5s, transform .5s; }
+    .run .screen h1 { opacity: 0; transform: translateY(8px); }
+    .run.done .screen h1 { opacity: 1; transform: none; }
+    .screen h1 span:last-child { transition: opacity .4s .35s; }
+    .run:not(.done) .screen h1 span:last-child { opacity: 0; }
+    .adcard { position: absolute; left: 22px; top: 18px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px;
+      background: rgba(255,255,255,.12); color: #e6e8eb; font-size: 14px; opacity: 0; transform: translateY(10px); transition: opacity .25s, transform .25s; }
+    .adcard b { background: var(--sub); color: #111; border-radius: 3px; padding: 0 6px; font-size: 12.5px; }
+    .adcard s { text-decoration: none; position: absolute; inset: 0; display: grid; place-items: center; border-radius: 6px; background: #111; color: var(--sub);
+      font-weight: 700; transform: scaleX(0); transform-origin: left; transition: transform .3s; }
+    .adcard.on { opacity: 1; transform: none; }
+    .adcard.kill s { transform: none; }
+    @media (max-width: 640px) { .adcard { left: 12px; top: 12px; font-size: 12.5px; } .cue { bottom: 12%; } }
     .adbreaks b { color: var(--ink); }
     @media (max-width: 640px) {
       .screen { aspect-ratio: 4 / 3.4; padding-bottom: 12%; }
@@ -157,10 +178,61 @@
     .steps li::before { content: counter(s); display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--ink); color: var(--page); font: 800 17px var(--display); margin-bottom: 14px; }
     .steps p { color: var(--soft); margin-top: 6px; }
     @media (max-width: 760px) { .steps { grid-template-columns: 1fr; gap: 26px; } }
-    .gestures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 32px; margin-top: 36px; border-top: 1px solid var(--line); }
-    .gestures div { padding: 12px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; font-size: 15.5px; }
+    .gdemo-wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) 1fr; gap: 40px; align-items: center; margin-top: 44px; }
+    .gscreen { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 14px; overflow: hidden;
+      background-image: radial-gradient(ellipse 70% 60% at 50% 40%, #23262c, #000 75%); }
+    .gscreen::after { content: ''; position: absolute; inset: 0; background: #000; opacity: var(--dim, 0); transition: opacity .2s; pointer-events: none; }
+    .fing { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: rgba(255,255,255,.85);
+      box-shadow: 0 0 0 8px rgba(255,255,255,.18); opacity: 0; left: 50%; top: 50%; z-index: 2; }
+    .ghud { position: absolute; left: 50%; top: 16%; transform: translateX(-50%); background: rgba(20,20,22,.8); color: #fff; border-radius: 10px;
+      padding: 8px 14px; font-size: 14px; min-width: 150px; text-align: center; opacity: 0; transition: opacity .2s; z-index: 3; }
+    .ghud div { height: 4px; background: rgba(255,255,255,.2); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+    .ghud i { display: block; height: 100%; width: 50%; background: var(--sub); transition: width .9s ease-in-out; }
+    .gdemo.show .ghud { opacity: 1; }
+    .gcap { margin-top: 12px; color: var(--soft); font-size: 15px; min-height: 1.6em; }
+    .gdemo[data-g] .fing.f1 { opacity: 1; animation: var(--anim) 2s ease-in-out both; }
+    .gdemo[data-g="bright"] { --anim: gUpL; } .gdemo[data-g="vol"] { --anim: gUpR; } .gdemo[data-g="seek"] { --anim: gSide; }
+    .gdemo[data-g="dbl"] { --anim: gDbl; } .gdemo[data-g="hold"] { --anim: gHold; } .gdemo[data-g="pinch"] { --anim: gPinchA; }
+    .gdemo[data-g="pinch"] .fing.f2 { opacity: 1; animation: gPinchB 2s ease-in-out both; }
+    @keyframes gUpL { 0% { left: 25%; top: 72%; opacity: 0; } 12% { opacity: 1; } 70% { left: 25%; top: 30%; opacity: 1; } 100% { left: 25%; top: 30%; opacity: 0; } }
+    @keyframes gUpR { 0% { left: 75%; top: 72%; opacity: 0; } 12% { opacity: 1; } 70% { left: 75%; top: 30%; opacity: 1; } 100% { left: 75%; top: 30%; opacity: 0; } }
+    @keyframes gSide { 0% { left: 28%; top: 62%; opacity: 0; } 12% { opacity: 1; } 70% { left: 72%; top: 62%; opacity: 1; } 100% { left: 72%; top: 62%; opacity: 0; } }
+    @keyframes gDbl { 0%, 100% { left: 80%; top: 55%; opacity: 0; transform: scale(1); } 10%, 22% { opacity: 1; transform: scale(.8); } 16%, 28% { transform: scale(1.1); } 34%, 46% { opacity: 1; transform: scale(.8); } 40%, 52% { transform: scale(1.1); } 80% { opacity: 1; left: 80%; top: 55%; } }
+    @keyframes gHold { 0% { left: 50%; top: 60%; opacity: 0; transform: scale(1.2); } 15% { opacity: 1; transform: scale(.85); } 80% { opacity: 1; transform: scale(.85); } 100% { opacity: 0; transform: scale(1.2); left: 50%; top: 60%; } }
+    @keyframes gPinchA { 0% { left: 45%; top: 55%; opacity: 0; } 12% { opacity: 1; } 70% { left: 30%; top: 70%; opacity: 1; } 100% { left: 30%; top: 70%; opacity: 0; } }
+    @keyframes gPinchB { 0% { left: 55%; top: 45%; opacity: 0; } 12% { opacity: 1; } 70% { left: 70%; top: 30%; opacity: 1; } 100% { left: 70%; top: 30%; opacity: 0; } }
+    .gscreen .rip { position: absolute; right: 6%; top: 50%; transform: translateY(-50%); color: #fff; font-weight: 700; opacity: 0; }
+    .gdemo[data-g="dbl"] .rip { animation: rip 2s both; }
+    @keyframes rip { 0%, 20% { opacity: 0; } 30%, 70% { opacity: 1; } 100% { opacity: 0; } }
+    .gestures { display: grid; grid-template-columns: 1fr; border-top: 1px solid var(--line); }
+    .gestures div { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; font-size: 15.5px;
+      cursor: pointer; border-left: 4px solid transparent; transition: background .2s, border-color .2s; }
+    .gestures div.on { background: color-mix(in srgb, var(--sub) 16%, transparent); border-left-color: var(--sub); }
     .gestures span { color: var(--soft); text-align: right; }
-    @media (max-width: 760px) { .gestures { grid-template-columns: 1fr; } }
+    @media (max-width: 860px) { .gdemo-wrap { grid-template-columns: 1fr; gap: 20px; } }
+
+    /* night mode demo */
+    .night { display: grid; grid-template-columns: 1fr 1.4fr; gap: 36px; align-items: center; margin-top: 32px; padding: 28px; border-radius: 14px; background: #000; color: #e9ebee; }
+    .night p { color: #a7adb6; margin: 6px 0 16px; max-width: 42ch; }
+    .wave { width: 100%; height: 120px; }
+    .wave rect { fill: var(--sub); transition: height .45s ease, y .45s ease; }
+    .wave line { stroke: #444851; stroke-dasharray: 4 6; }
+    .toggle { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 12px; font-weight: 700; }
+    .toggle .knob { width: 46px; height: 26px; border-radius: 13px; background: #3a3e46; position: relative; transition: background .2s; }
+    .toggle .knob::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; }
+    .toggle[aria-pressed="true"] .knob { background: var(--sub); }
+    .toggle[aria-pressed="true"] .knob::after { transform: translateX(20px); }
+    .toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: 6px; }
+    @media (max-width: 760px) { .night { grid-template-columns: 1fr; padding: 22px; } }
+
+    /* comparison: Open Player's checks draw in when the table comes into view */
+    .tablewrap .us .v svg { stroke-dasharray: 26; stroke-dashoffset: 0; }
+    .anim .tablewrap .us .v { opacity: 0; transform: translateX(-6px); }
+    .anim .tablewrap .us .v svg { stroke-dashoffset: 26; }
+    .anim.seen .tablewrap .us .v { opacity: 1; transform: none; transition: opacity .35s var(--d), transform .35s var(--d); }
+    .anim.seen .tablewrap .us .v svg { stroke-dashoffset: 0; transition: stroke-dashoffset .45s calc(var(--d) + .1s) ease-out; }
+    .anim thead .us { box-shadow: inset 0 0 0 var(--sub); }
+    .anim.seen thead .us { box-shadow: inset 0 4px 0 var(--sub); transition: box-shadow .5s; }
 
     /* every device */
     .devices { margin-top: 30px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
@@ -236,15 +308,17 @@
 
   <header class="hero" id="top">
     <div class="wrap">
-      <div class="screen">
+      <div class="screen" id="screen">
         <span class="badge-hd" aria-hidden="true">CC</span>
-        <h1><span>The player that plays your videos.</span><span>Not ads.</span></h1>
+        <div class="adcard" id="adcard" aria-hidden="true"><b>Ad</b><span>Your video resumes in 5</span><s>Removed</s></div>
+        <p class="cue" id="cue" aria-hidden="true"></p>
+        <h1 id="caption"><span>The player that plays your videos.</span><span>Not ads.</span></h1>
       </div>
-      <div class="player-bar" aria-hidden="true">
-        <svg><use href="#play"/></svg>
-        <span class="time">42:17</span>
-        <div class="scrub"><i></i></div>
-        <span class="adbreaks">Ad breaks: <b>none</b></span>
+      <div class="player-bar">
+        <button class="replay" id="replay" aria-label="Play the intro again"><svg><use href="#play"/></svg></button>
+        <span class="time" id="tc" aria-hidden="true">42:17</span>
+        <div class="scrub" id="scrub" aria-hidden="true"><i></i><em style="left:7%"></em><em style="left:16%"></em><em style="left:25%"></em></div>
+        <span class="adbreaks" aria-hidden="true">Ad breaks: <b id="adn">none</b></span>
       </div>
 
       <div class="hero-body">
@@ -321,6 +395,14 @@
   <section id="features">
     <div class="wrap">
       <h2>What’s inside</h2>
+      <div class="night">
+        <div>
+          <h3>Try night mode</h3>
+          <p>Loud scenes come down, quiet voices come up, so you can watch late without waking anyone.</p>
+          <button class="toggle" id="nightBtn" aria-pressed="false"><span class="knob"></span><span id="nightLbl">Night mode off</span></button>
+        </div>
+        <svg class="wave" id="wave" viewBox="0 0 480 120" preserveAspectRatio="none" aria-hidden="true"></svg>
+      </div>
       <div class="groups">
         <div>
           <h3>Watching</h3>
@@ -375,13 +457,22 @@
         <li><h3>Show your media</h3><p>In the Android app, tap <b>Show all my videos &amp; music</b> and allow access once. Prefer not to? Choose <b>I’ll add files myself</b>.</p></li>
         <li><h3>Play with gestures</h3><p>Tap a video and control it with swipes and taps.</p></li>
       </ol>
-      <div class="gestures">
-        <div><b>Left side, up or down</b><span>Brightness</span></div>
-        <div><b>Right side, up or down</b><span>Volume, up to 200%</span></div>
-        <div><b>Swipe sideways</b><span>Seek with a preview</span></div>
-        <div><b>Double-tap a side</b><span>Skip 10 seconds</span></div>
-        <div><b>Press and hold</b><span>2× speed while held</span></div>
-        <div><b>Pinch</b><span>Zoom</span></div>
+      <div class="gdemo-wrap">
+        <div class="gdemo" id="gdemo" aria-hidden="true">
+          <div class="gscreen">
+            <i class="fing f1"></i><i class="fing f2"></i>
+            <div class="ghud"><span id="ghudT">Brightness</span><div><i id="ghudF"></i></div></div>
+          </div>
+          <p class="gcap" id="gcap"></p>
+        </div>
+      <div class="gestures" id="glist">
+        <div data-g="bright" tabindex="0"><b>Left side, up or down</b><span>Brightness</span></div>
+        <div data-g="vol" tabindex="0"><b>Right side, up or down</b><span>Volume, up to 200%</span></div>
+        <div data-g="seek" tabindex="0"><b>Swipe sideways</b><span>Seek with a preview</span></div>
+        <div data-g="dbl" tabindex="0"><b>Double-tap a side</b><span>Skip 10 seconds</span></div>
+        <div data-g="hold" tabindex="0"><b>Press and hold</b><span>2× speed while held</span></div>
+        <div data-g="pinch" tabindex="0"><b>Pinch</b><span>Zoom</span></div>
+      </div>
       </div>
 
       <div class="devices" id="everywhere">
@@ -522,6 +613,125 @@
         $('verifiedLine').hidden = false;
       }
     })();
+    /* ---------- motion (skipped when the visitor prefers reduced motion) ---------- */
+    const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Hero: the intro plays like a video. Ad markers on the timeline get removed one by one.
+    (() => {
+      const hero = document.querySelector('.hero'), cue = document.getElementById('cue'), ad = document.getElementById('adcard');
+      const bar = document.querySelector('#scrub i'), marks = [...document.querySelectorAll('#scrub em')];
+      const tc = document.getElementById('tc'), adn = document.getElementById('adn');
+      const cues = [[0.0, 'Most free players pay for themselves with ads.'], [0.32, 'Banners. Pop-ups. Ads before your film.'], [0.7, '']];
+      const END = 42 * 60 + 17, DUR = 6500;
+      let raf, t0;
+      const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+      function run() {
+        cancelAnimationFrame(raf);
+        hero.classList.add('run'); hero.classList.remove('done');
+        marks.forEach(m => m.classList.remove('gone'));
+        adn.textContent = marks.length; ad.className = 'adcard'; cue.className = 'cue';
+        bar.style.animation = 'none'; bar.style.width = '0%';
+        t0 = performance.now();
+        let shownCue = -1;
+        const frame = now => {
+          const k = Math.min(1, (now - t0) / DUR), pos = k * 38;
+          bar.style.width = pos + '%';
+          tc.textContent = fmt(k * END);
+          const ci = cues.findLastIndex(c => k >= c[0]);
+          if (ci !== shownCue) { shownCue = ci; cue.classList.remove('on'); setTimeout(() => { cue.textContent = cues[ci][1]; if (cues[ci][1]) cue.classList.add('on'); }, 180); }
+          marks.forEach((m, i) => {
+            if (!m.classList.contains('gone') && pos >= parseFloat(m.style.left)) {
+              m.classList.add('gone'); adn.textContent = marks.length - i - 1 || 'none';
+              ad.className = 'adcard on'; setTimeout(() => ad.classList.add('kill'), 260); setTimeout(() => ad.classList.remove('on'), 900);
+            }
+          });
+          if (k >= 0.72) hero.classList.add('done');
+          if (k < 1) raf = requestAnimationFrame(frame);
+        };
+        raf = requestAnimationFrame(frame);
+      }
+      document.getElementById('replay').onclick = run;
+      if (!calm) run();
+    })();
+
+    // Comparison: draw Open Player's column in when the table scrolls into view.
+    (() => {
+      const sec = document.getElementById('compare');
+      sec.querySelectorAll('tbody .us .v').forEach((v, i) => v.style.setProperty('--d', (i * 0.07) + 's'));
+      if (calm || !('IntersectionObserver' in window)) return;
+      sec.classList.add('anim');
+      const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { sec.classList.add('seen'); io.disconnect(); } }, { threshold: 0.18 });
+      io.observe(sec.querySelector('.tablewrap'));
+    })();
+
+    // Gestures: a small screen acts out each gesture; tap a row to see it.
+    (() => {
+      const demo = document.getElementById('gdemo'), rows = [...document.querySelectorAll('#glist [data-g]')];
+      const scr = demo.querySelector('.gscreen'), hudT = document.getElementById('ghudT'), hudF = document.getElementById('ghudF'), cap = document.getElementById('gcap');
+      scr.insertAdjacentHTML('beforeend', '<span class="rip">10 s »</span>');
+      const info = {
+        bright: ['Brightness', [30, 85], 'Swipe up on the left for brightness'],
+        vol: ['Volume', [40, 100], 'Swipe up on the right for volume, up to 200%'],
+        seek: ['+1:30', [38, 62], 'Swipe sideways to seek'],
+        dbl: ['Skip 10 s', [50, 58], 'Double-tap a side to skip'],
+        hold: ['2× speed', [50, 100], 'Press and hold for 2× speed'],
+        pinch: ['Zoom 160%', [35, 80], 'Pinch to zoom'],
+      };
+      let i = 0, timer, auto = true;
+      function show(g) {
+        const [t, [a, b], c] = info[g];
+        rows.forEach(r => r.classList.toggle('on', r.dataset.g === g));
+        demo.removeAttribute('data-g'); void demo.offsetWidth; demo.dataset.g = g;
+        hudT.textContent = t; cap.textContent = c;
+        hudF.style.transition = 'none'; hudF.style.width = a + '%'; void hudF.offsetWidth; hudF.style.transition = ''; 
+        demo.classList.add('show');
+        setTimeout(() => { hudF.style.width = b + '%'; }, 250);
+        if (g === 'bright') { scr.style.setProperty('--dim', .5); setTimeout(() => scr.style.setProperty('--dim', 0), 300); }
+      }
+      function next() { show(rows[i % rows.length].dataset.g); i++; timer = setTimeout(next, 2300); }
+      rows.forEach(r => {
+        const pick = () => { auto = false; clearTimeout(timer); show(r.dataset.g); };
+        r.onclick = pick; r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } };
+      });
+      if (calm || !('IntersectionObserver' in window)) { show('bright'); return; }
+      new IntersectionObserver(es => {
+        const vis = es.some(e => e.isIntersecting);
+        clearTimeout(timer);
+        if (vis && auto) next();
+      }, { threshold: 0.4 }).observe(demo);
+    })();
+
+    // Night mode: a moving waveform; turning night mode on squeezes the loud peaks.
+    (() => {
+      const svg = document.getElementById('wave'), btn = document.getElementById('nightBtn'), lbl = document.getElementById('nightLbl');
+      const N = 64, W = 480, H = 120, bw = W / N;
+      const level = i => { const x = i / N; return 0.18 + 0.12 * Math.sin(i * 0.9) + (Math.abs(Math.sin(x * 9.5)) > 0.93 ? 0.62 : 0) + 0.08 * Math.sin(i * 2.3); };
+      let html = `<line x1="0" x2="${W}" y1="${H * 0.18}" y2="${H * 0.18}"/><line x1="0" x2="${W}" y1="${H * 0.82}" y2="${H * 0.82}"/>`;
+      for (let i = 0; i < N; i++) html += `<rect x="${i * bw + 1}" width="${bw - 2}" rx="2"/>`;
+      svg.innerHTML = html;
+      const rects = [...svg.querySelectorAll('rect')];
+      let night = false, off = 0;
+      const shape = v => night ? Math.min(0.5, 0.2 + v * 0.42) : Math.min(0.98, v);
+      function draw() {
+        rects.forEach((r, i) => {
+          const h = shape(Math.max(0.06, level(i + off))) * H;
+          const y = ((H - h) / 2).toFixed(1);
+          r.setAttribute('height', h.toFixed(1)); r.setAttribute('y', y);
+          r.style.height = h.toFixed(1) + 'px'; r.style.y = y + 'px';   // lets CSS animate the change where supported
+        });
+      }
+      draw();
+      btn.onclick = () => {
+        night = !night; btn.setAttribute('aria-pressed', night); lbl.textContent = night ? 'Night mode on' : 'Night mode off'; draw();
+      };
+      if (calm || !('IntersectionObserver' in window)) return;
+      let t;
+      new IntersectionObserver(es => {
+        clearInterval(t);
+        if (es.some(e => e.isIntersecting)) t = setInterval(() => { off++; draw(); }, 420);
+      }).observe(svg);
+    })();
+
     document.addEventListener('click', async e => {
       const b = e.target.closest('[data-copy]'); if (!b) return;
       try { await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent); b.textContent = 'Copied'; b.classList.add('done'); }
