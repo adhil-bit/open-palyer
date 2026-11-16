@@ -6,12 +6,13 @@
   <title>Open Player: the video and music player with no ads</title>
   <meta name="description" content="Open Player is a free, open-source video and music player with no ads and no tracking. Use it as an Android app or straight from your browser on any device.">
   <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta property="og:image:alt" content="Open Player: ad-free, no tracking">
   <meta name="theme-color" content="#1a1c20" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="app/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app/icons/icon-192.png">
   <meta property="og:title" content="Open Player: no ads, no tracking">
   <meta property="og:description" content="A free video and music player for Android and any browser. Your files never leave your device.">
-  <meta property="og:image" content="app/icons/icon-512.png">
+  <meta property="og:image" content="app/icons/stamp-1200.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -29,7 +30,8 @@
       --soft: #5b616b;
       --line: #dcdfe4;
       --screen: #000000;
-      --sub: #ffd62e;          /* subtitle yellow */
+      --sub: #e11d48;          /* brand cherry */
+      --admark: #ffcc00;       /* ad-break markers, as on video sites */
       --yes: #187a50;
       --no: #b8412f;
       --part: #946200;
@@ -79,7 +81,7 @@
     .screen::before { content: ''; position: absolute; inset: 0; pointer-events: none;
       background: radial-gradient(ellipse 80% 70% at 50% 35%, #1d1f24 0%, #000 72%); }
     .screen h1 { position: relative; text-align: center; font: 700 clamp(26px, 4.1vw, 54px)/1.2 var(--text); letter-spacing: 0;
-      color: var(--sub); text-shadow: 0 2px 0 #000, 0 0 3px #000, 0 0 14px rgba(0,0,0,.7); }
+      color: #fff; text-shadow: 0 2px 0 #000, 0 0 3px #000, 0 0 14px rgba(0,0,0,.7); }
     @media (min-width: 641px) { .screen h1 span { white-space: nowrap; } }
     .screen h1 span { display: block; }
     .badge-hd { position: absolute; top: 18px; right: 20px; font: 600 13px var(--text); color: #9ba1aa; border: 1px solid #3a3d44; border-radius: 4px; padding: 1px 7px; }
@@ -93,7 +95,7 @@
     .adbreaks { white-space: nowrap; }
     .replay { all: unset; cursor: pointer; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; }
     .replay:hover { background: var(--line); }
-    .scrub em { position: absolute; top: -2px; width: 5px; height: 8px; margin-left: -2px; border-radius: 2px; background: var(--sub); transform: scaleY(0); transition: transform .25s; }
+    .scrub em { position: absolute; top: -2px; width: 5px; height: 8px; margin-left: -2px; border-radius: 2px; background: var(--admark); transform: scaleY(0); transition: transform .25s; }
     .run .scrub em { transform: none; }
     .scrub em.gone { transform: scale(2.4, 0) !important; opacity: 0; transition: transform .35s, opacity .35s; }
     .cue { position: absolute; left: 5%; right: 5%; bottom: 9%; text-align: center; margin: 0; font: 700 clamp(20px, 2.8vw, 36px)/1.25 var(--text);
@@ -106,9 +108,9 @@
     .run:not(.done) .screen h1 span:last-child { opacity: 0; }
     .adcard { position: absolute; left: 22px; top: 18px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px;
       background: rgba(255,255,255,.12); color: #e6e8eb; font-size: 14px; opacity: 0; transform: translateY(10px); transition: opacity .25s, transform .25s; }
-    .adcard b { background: var(--sub); color: #111; border-radius: 3px; padding: 0 6px; font-size: 12.5px; }
+    .adcard b { background: var(--admark); color: #111; border-radius: 3px; padding: 0 6px; font-size: 12.5px; }
     .adcard s { text-decoration: none; position: absolute; inset: 0; display: grid; place-items: center; border-radius: 6px; background: #111; color: var(--sub);
-      font-weight: 700; transform: scaleX(0); transform-origin: left; transition: transform .3s; }
+      font-weight: 700; transform: scaleX(0); transform-origin: left; transition: transform .3s; color: #fff; background: var(--sub); }
     .adcard.on { opacity: 1; transform: none; }
     .adcard.kill s { transform: none; }
     @media (max-width: 640px) { .adcard { left: 12px; top: 12px; font-size: 12.5px; } .cue { bottom: 12%; } }
@@ -124,8 +126,8 @@
     .btn { display: inline-flex; align-items: center; gap: 12px; padding: 13px 20px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 17px; line-height: 1.2; }
     .btn svg { width: 24px; height: 24px; }
     .btn small { display: block; font-weight: 400; font-size: 13.5px; opacity: .8; }
-    .btn.main { background: var(--sub); color: #1b1b1b; }
-    .btn.main:hover { background: #ffe766; }
+    .btn.main { background: var(--sub); color: #fff; }
+    .btn.main:hover { background: #be123c; }
     .btn.plain { border: 1.5px solid var(--ink); }
     .btn.plain:hover { background: var(--raised); }
     .verified-line { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 14.5px; color: var(--yes); text-decoration: none; }
@@ -141,7 +143,7 @@
     thead th { font: 700 15px var(--display); font-stretch: 105%; padding-top: 18px; background: var(--raised); }
     thead th small { display: block; font: 400 13px var(--text); color: var(--soft); }
     td:first-child { font-weight: 700; width: 24%; position: sticky; left: 0; background: var(--raised); }
-    .us { background: color-mix(in srgb, var(--sub) 14%, var(--raised)); }
+    .us { background: color-mix(in srgb, var(--sub) 6%, var(--raised)); }
     thead .us { box-shadow: inset 0 4px 0 var(--sub); }
     td small { display: block; color: var(--soft); font-size: 13.5px; line-height: 1.45; margin-top: 3px; }
     .v { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
@@ -207,7 +209,7 @@
     .gestures { display: grid; grid-template-columns: 1fr; border-top: 1px solid var(--line); }
     .gestures div { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; font-size: 15.5px;
       cursor: pointer; border-left: 4px solid transparent; transition: background .2s, border-color .2s; }
-    .gestures div.on { background: color-mix(in srgb, var(--sub) 16%, transparent); border-left-color: var(--sub); }
+    .gestures div.on { background: color-mix(in srgb, var(--sub) 10%, transparent); border-left-color: var(--sub); }
     .gestures span { color: var(--soft); text-align: right; }
     @media (max-width: 860px) { .gdemo-wrap { grid-template-columns: 1fr; gap: 20px; } }
 
@@ -286,7 +288,11 @@
 
     /* closing screen */
     .end { margin-top: 96px; background: var(--screen); color: #fff; padding: 72px 0; text-align: center; }
-    .end p.cap { font: 700 clamp(24px, 3.6vw, 40px)/1.25 var(--text); color: var(--sub); text-shadow: 0 2px 0 #000; }
+    .end p.cap { font: 700 clamp(24px, 3.6vw, 40px)/1.25 var(--text); color: #fff; text-shadow: 0 2px 0 #000; }
+    .stamp { width: 132px; height: 132px; margin: 0 auto 22px; display: block; }
+    @media (prefers-reduced-motion: no-preference) { .stamp .ring { transform-origin: 256px 256px; animation: spin 24s linear infinite; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .brand .adfree { font: 800 12px var(--text); color: #fff; background: var(--sub); border-radius: 999px; padding: 2px 8px; }
     .end .ctas { justify-content: center; margin-top: 28px; }
     .end .btn.plain { border-color: #fff; color: #fff; }
     .end .btn.plain:hover { background: #1c1e22; }
@@ -310,7 +316,7 @@
 
   <nav>
     <div class="wrap">
-      <a class="brand" href="#top"><img src="app/icons/icon.svg" alt="">Open Player</a>
+      <a class="brand" href="#top"><img src="app/icons/icon.svg" alt="">Open Player<span class="adfree">ad-free</span></a>
       <div class="navlinks"><a href="#compare">Compare</a><a href="#features">Features</a><a href="#desktop">Desktop</a><a href="#use">How to use</a><a href="#privacy">Privacy</a><a href="#verify">Verify</a><a href="#faq">FAQ</a></div>
       <a class="navcta" href="#download">Download</a>
     </div>
@@ -589,6 +595,13 @@
 
   <div class="end">
     <div class="wrap">
+      <svg class="stamp" viewBox="0 0 512 512" role="img" aria-label="Ad-free, no tracking">
+        <rect width="512" height="512" rx="116" fill="#e11d48"/>
+        <defs><path id="stampc" d="M256 256m-170 0a170 170 0 1 1 340 0a170 170 0 1 1 -340 0"/></defs>
+        <circle cx="256" cy="256" r="206" fill="none" stroke="#fff" stroke-width="6" opacity=".6"/>
+        <g class="ring"><text font-size="40" font-weight="800" letter-spacing="7" fill="#fff" font-family="Archivo, Arial, sans-serif"><textPath href="#stampc" textLength="1040" lengthAdjust="spacing">AD-FREE • NO TRACKING • AD-FREE • NO TRACKING •</textPath></text></g>
+        <path d="M220 178c-8-4.8-17.5.9-17.5 10.2v135.6c0 9.3 9.5 15 17.5 10.2l113-67.8c7.7-4.6 7.7-15.8 0-20.4z" fill="#fff" transform="translate(256,256) scale(.92) translate(-256,-256)"/>
+      </svg>
       <p class="cap">Watch without the ads.</p>
       <div class="ctas">
         <a class="btn main" data-apk href="https://github.com/adhil-bit/open-palyer/releases/latest" rel="noopener"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>

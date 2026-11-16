@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 // The website's download section: the APK link there comes with its checksum and signing fingerprint.
 const ANDROID_APK_URL = new URL('../#download', location.href).href;
 const VERIFY_URL = new URL('../#verify', location.href).href;
@@ -652,7 +652,7 @@ async function sheetSettings() {
     ${opt('tghelp', 'i-info', 'Telegram / Plus downloads not showing?')}`
     : `
     <div class="group">Your media</div>
-    ${opt('getapp', 'i-android', 'Get the Android app<small>Shows every video and song on your phone automatically</small>', '<span class="val">Recommended</span>')}
+    ${opt('getapp', 'i-dl', 'Get the app<small>Desktop app for Linux, Windows, Mac; Android app; install this web app</small>', '<span class="val">Recommended</span>')}
     ${opt('tghelp', 'i-info', 'Telegram / Plus downloads not showing?')}`;
   const draw = (info) => `${mediaSection}
     <div class="group">Playback</div>
@@ -727,7 +727,7 @@ async function sheetSettings() {
     if (o === 'deep') { closeSheet(); return toggleDeepScan(); }
     if (o === 'rescan') { closeSheet(); await scanDevice(); return; }
     if (o === 'tghelp') { closeSheet(); return sheetTelegramHelp(); }
-    if (o === 'getapp') { window.open(ANDROID_APK_URL, '_blank', 'noopener'); return; }
+    if (o === 'getapp') { closeSheet(); return sheetGetApp(); }
     saveSettings(); redraw();
   };
 }
@@ -3397,3 +3397,43 @@ async function deskRestore() {
   await DESK.allow([...keep.map(f => f.path), ...keep.map(f => f.subPath).filter(Boolean)]);
   deskAddPaths(keep);
 }
+
+/* =================================================================
+   "Get app" (web version only): install this web app, or download the
+   desktop app (Linux, Windows, Mac) or the Android app.
+   ================================================================= */
+const DL = 'https://github.com/adhil-bit/open-palyer/releases/download/desktop/';
+const SITE = new URL('../', location.href).href;
+let installEvt = null;
+const userOS = (() => { const ua = navigator.userAgent; return /Android/.test(ua) ? 'android' : /iPhone|iPad|iPod/.test(ua) ? 'ios' : /Windows/.test(ua) ? 'win' : /Mac OS X/.test(ua) ? 'mac' : /Linux|CrOS/.test(ua) ? 'linux' : ''; })();
+const installedPWA = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+window.addEventListener('appinstalled', () => { installEvt = null; snack('Open Player is installed'); });
+function sheetGetApp() {
+  const desk = [
+    ['linux', 'appimage', 'Linux · AppImage', 'Any distro. Make it executable, then double-click', 'OpenPlayer-linux-x86_64.AppImage'],
+    ['linux', 'deb', 'Ubuntu / Debian · .deb', 'sudo apt install ./OpenPlayer-linux-amd64.deb', 'OpenPlayer-linux-amd64.deb'],
+    ['win', 'exe', 'Windows', '64-bit installer', 'OpenPlayer-win-x64.exe'],
+    ['mac', 'dmg', 'Mac', 'Apple silicon (M1 and newer)', 'OpenPlayer-mac-arm64.dmg'],
+  ];
+  const mine = desk.filter(d => d[0] === userOS), others = desk.filter(d => d[0] !== userOS);
+  const row = d => opt('d:' + d[4], 'i-laptop', `${d[2]}<small>${esc(d[3])}</small>`, d[0] === userOS ? '<span class="val">For this computer</span>' : '');
+  const pwa = installedPWA() ? '' : opt('pwa', 'i-dl', `Install this web app<small>${installEvt ? 'Adds Open Player to your apps, works offline' : userOS === 'ios' ? 'Safari › Share › Add to Home Screen' : 'Browser menu › Install app (or the install icon in the address bar)'}</small>`);
+  const b = openSheet('Get Open Player',
+    (userOS === 'android' ? opt('android', 'i-android', 'Android app<small>Recommended: finds all your videos, plays MKV, x265, AC3 and DTS</small>') : '') +
+    (mine.length ? `<div class="group">Desktop app · plays MKV, x265, AC3 and DTS</div>${mine.map(row).join('')}` : '') +
+    (pwa ? `<div class="group">Web app</div>${pwa}` : '') +
+    `<div class="group">${mine.length ? 'Other systems' : 'Desktop app · plays MKV, x265, AC3 and DTS'}</div>${others.map(row).join('')}` +
+    (userOS !== 'android' ? opt('android', 'i-android', 'Android app<small>For your phone</small>') : '') +
+    `<p class="sheet-note">Desktop builds aren’t signed with a paid certificate, so Windows and Mac show a warning the first time. Checksums are on the <a href="${SITE}#desktop" target="_blank" rel="noopener">website</a>.</p>`);
+  b.onclick = async e => {
+    const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
+    if (o.startsWith('d:')) { window.open(DL + o.slice(2), '_blank', 'noopener'); closeSheet(); return; }
+    if (o === 'android') { window.open(ANDROID_APK_URL, '_blank', 'noopener'); closeSheet(); return; }
+    if (o === 'pwa') {
+      if (installEvt) { closeSheet(); installEvt.prompt(); try { await installEvt.userChoice; } catch {} installEvt = null; }
+      else snack(userOS === 'ios' ? 'In Safari: Share › Add to Home Screen' : 'Use your browser menu › Install app', null, null, 6000);
+    }
+  };
+}
+if (!NATIVE && !DESK) { $('#btnGet').hidden = false; $('#btnGet').onclick = sheetGetApp; }

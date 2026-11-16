@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<rect width="512" height="512" rx="116" fill="#e11d48"/>
+<defs><path id="c" d="M256 256m-170 0a170 170 0 1 1 340 0a170 170 0 1 1 -340 0"/></defs>
+<circle cx="256" cy="256" r="206" fill="none" stroke="#fff" stroke-width="6" opacity=".6"/>
+<g class="ring"><text font-size="40" font-weight="800" letter-spacing="7" fill="#fff" font-family="Archivo, Arial, Helvetica, sans-serif"><textPath href="#c" textLength="1040" lengthAdjust="spacing">AD-FREE • NO TRACKING • AD-FREE • NO TRACKING •</textPath></text></g>
+<g transform="translate(256,256) scale(.92) translate(-256,-256)"><path d="M220 178c-8-4.8-17.5.9-17.5 10.2v135.6c0 9.3 9.5 15 17.5 10.2l113-67.8c7.7-4.6 7.7-15.8 0-20.4z" fill="#fff"/></g>
+</svg>
