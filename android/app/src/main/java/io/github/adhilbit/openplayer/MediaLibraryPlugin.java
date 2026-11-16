@@ -90,6 +90,8 @@ public class MediaLibraryPlugin extends Plugin {
     private static final boolean MODERN = Build.VERSION.SDK_INT >= 33;
 
     private ActivityResultLauncher<IntentSenderRequest> confirmLauncher;
+    private ActivityResultLauncher<String[]> pickLauncher;
+    private PluginCall pickCall;
     private PluginCall pendingCall;
     private Runnable pendingOk;
     private BroadcastReceiver noisyReceiver;
@@ -98,6 +100,28 @@ public class MediaLibraryPlugin extends Plugin {
 
     @Override
     public void load() {
+        // "Add files myself": Android's own file picker. Unlike a browser file input it gives
+        // real content:// links, so the all-formats engine can play MKV/AVI/AC3 files picked here.
+        pickLauncher = getBridge().registerForActivityResult(
+            new ActivityResultContracts.OpenMultipleDocuments(),
+            uris -> {
+                PluginCall c = pickCall;
+                pickCall = null;
+                if (c == null) return;
+                JSArray out = new JSArray();
+                if (uris != null) {
+                    for (Uri u : uris) {
+                        try {
+                            getContext().getContentResolver().takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        } catch (Exception ignored) {}
+                        JSObject o = describeUri(u, null);
+                        if (o != null) out.put(o);
+                    }
+                }
+                JSObject r = new JSObject();
+                r.put("files", out);
+                c.resolve(r);
+            });
         // Android shows its own "Allow Open Player to delete / modify this file?" dialog for
         // files that belong to other apps. Its answer comes back here.
         confirmLauncher = getBridge().registerForActivityResult(
@@ -781,9 +805,13 @@ public class MediaLibraryPlugin extends Plugin {
         if (Intent.ACTION_VIEW.equals(action)) uri = intent.getData();
         else if (Intent.ACTION_SEND.equals(action)) uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
         if (uri == null) return null;
+        return describeUri(uri, intent.getType());
+    }
+
+    private JSObject describeUri(Uri uri, String type) {
         JSObject o = new JSObject();
         o.put("uri", uri.toString());
-        o.put("mime", intent.getType() != null ? intent.getType() : getContext().getContentResolver().getType(uri));
+        o.put("mime", type != null ? type : getContext().getContentResolver().getType(uri));
         String name = uri.getLastPathSegment();
         try (Cursor c = getContext().getContentResolver().query(uri, new String[] { OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE }, null, null, null)) {
             if (c != null && c.moveToFirst()) {
@@ -794,6 +822,38 @@ public class MediaLibraryPlugin extends Plugin {
         } catch (Exception ignored) {}
         o.put("name", name);
         return o;
+    }
+
+    @PluginMethod
+    public void pickFiles(PluginCall call) {
+        if (pickLauncher == null) { call.reject("Picker not available"); return; }
+        if (pickCall != null) pickCall.reject("Replaced by a new request");
+        pickCall = call;
+        try {
+            pickLauncher.launch(new String[] { "video/*", "audio/*", "application/octet-stream", "application/x-matroska" });
+        } catch (Exception e) {
+            pickCall = null;
+            call.reject("Could not open the file picker");
+        }
+    }
+
+    /** Files picked earlier: still readable? (permission can be lost if the file is moved). */
+    @PluginMethod
+    public void checkUris(PluginCall call) {
+        JSArray in = call.getArray("uris");
+        JSArray ok = new JSArray();
+        if (in != null) {
+            for (int i = 0; i < in.length(); i++) {
+                String s = in.optString(i, null);
+                if (s == null) continue;
+                try (Cursor c = getContext().getContentResolver().query(Uri.parse(s), new String[] { OpenableColumns.SIZE }, null, null, null)) {
+                    if (c != null && c.moveToFirst()) ok.put(s);
+                } catch (Exception ignored) {}
+            }
+        }
+        JSObject r = new JSObject();
+        r.put("uris", ok);
+        call.resolve(r);
     }
 
     @PluginMethod

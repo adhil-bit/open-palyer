@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.6.2';
 // The website's download section: the APK link there comes with its checksum and signing fingerprint.
 const ANDROID_APK_URL = new URL('../#download', location.href).href;
 const VERIFY_URL = new URL('../#verify', location.href).href;
@@ -155,7 +155,7 @@ async function scanDevice(quiet) {
       wantAudio ? ML.listAudio() : { items: [] },
     ]);
     // keep manually-added files, replace everything that came from the device
-    lib.items = lib.items.filter(i => !i.native);
+    lib.items = lib.items.filter(i => !i.native || i.keep);   // keep files picked or opened by hand
     lib.byId = new Map(lib.items.map(i => [i.id, i]));
     for (const m of v.items) {
       const it = {
@@ -546,10 +546,45 @@ function sheetAdd() {
   b.onclick = e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
     closeSheet();
-    if (o === 'files') $('#pickFiles').click();
+    if (o === 'files') NATIVE && ML.pickFiles ? pickNative() : $('#pickFiles').click();
     if (o === 'folder') $('#pickFolder').click();
     if (o === 'url') sheetUrl();
   };
+}
+/* Android app: Android's own picker gives content:// links, so these files can use the
+   all-formats engine (a browser file input only gives a blob the native player can't read). */
+let picked = store.get('picked', []);
+function addPicked(f, ts) {
+  const id = 'pk:' + f.uri;
+  if (lib.byId.has(id)) return null;
+  const kind = (f.mime || '').startsWith('audio/') || AUDIO_EXT.test(f.name || '') ? 'audio' : 'video';
+  if (kind === 'video' && !(f.mime || '').startsWith('video/') && !VIDEO_EXT.test(f.name || '')) return null;
+  const folder = `Added ${new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+  const it = { id, kind, native: true, keep: true, picked: true, nuri: f.uri, npath: null, src: Cap.convertFileSrc(f.uri),
+    name: f.name || 'Video', size: f.size || 0, mtime: ts, folder, dur: 0, thumb: null, sub: null };
+  if (kind === 'audio') { it.title = baseName(it.name); it.artist = ''; it.album = folder; }
+  lib.items.push(it); lib.byId.set(id, it);
+  return it;
+}
+async function pickNative() {
+  let r; try { r = await ML.pickFiles(); } catch { return $('#pickFiles').click(); }
+  const files = r?.files || []; if (!files.length) return;
+  const ts = Date.now(), added = files.map(f => addPicked(f, ts)).filter(Boolean);
+  picked = [...picked.filter(p => !added.some(a => a.nuri === p.uri)), ...added.map(a => ({ uri: a.nuri, name: a.name, size: a.size, mime: '', ts }))];
+  store.set('picked', picked);
+  adoptMovedHistory(added);
+  render(); hydrateThumbs();
+  snack(added.length ? `${plural(added.length, 'file')} added` : 'Those files are already in your library');
+}
+async function restorePicked() {
+  if (!picked.length || !ML.checkUris) return;
+  try {
+    const { uris } = await ML.checkUris({ uris: picked.map(p => p.uri) });
+    const ok = new Set(uris);
+    picked = picked.filter(p => ok.has(p.uri)); store.set('picked', picked);
+    picked.forEach(p => addPicked(p, p.ts));
+    render(); hydrateThumbs();
+  } catch {}
 }
 function sheetUrl() {
   const b = openSheet('Network stream', `
@@ -1032,7 +1067,18 @@ function onError() {
   const code = P.v.error?.code;
   if (!P.v.isNative && (code === 3 || code === 4) && canGoNative(P.item)) return switchEngine('native', 'Opening with the all-formats player…');
   if (P.v.isNative) return ptoast(`Couldn’t play this file${P.v.error?.message ? ' · ' + P.v.error.message.slice(0, 80) : ''}`, null, null, 6000);
-  const msg = code === 4 ? 'This file’s format isn’t supported by your browser. MP4 (H.264) and WebM play best.'
+  if (code === 4 && !NATIVE) {
+    const mkv = /\.(mkv|avi|flv|ts|m2ts|mts|vob|wmv|divx|mpe?g)$/i.test(P.item?.name || '');
+    const why = mkv ? 'Your browser can’t decode this file. Files like this usually use HEVC (x265) video or AC3/DTS sound, which browsers don’t play.'
+      : 'Your browser can’t decode this file’s video or sound.';
+    return IS_ANDROID_BROWSER
+      ? ptoast(why + ' The Android app plays it.', 'Get the app', () => window.open(ANDROID_APK_URL, '_blank', 'noopener'), 10000)
+      : ptoast(why + ' On a phone, the Open Player Android app plays it.', null, null, 10000);
+  }
+  if ((code === 3 || code === 4) && NATIVE && P.item && !P.item.native) {
+    return ptoast('This copy was added the old way. Add it again with ＋ › Pick videos to play it with the all-formats player.', 'Pick videos', () => { closePlayer(); pickNative(); }, 10000);
+  }
+  const msg = code === 4 ? 'This file’s format isn’t supported here. MP4 (H.264) and WebM play best.'
     : code === 2 ? 'Network error while loading the video.' : 'Couldn’t play this video.';
   ptoast(msg, null, null, 6000);
 }
@@ -2150,7 +2196,7 @@ function handleOpenFile(f) {
   const id = 'in:' + f.uri;
   let it = lib.byId.get(id);
   if (!it) {
-    it = { id, kind, native: true, nuri: f.uri, npath: null, src: Cap.convertFileSrc(f.uri), name: f.name || 'Shared file',
+    it = { id, kind, native: true, keep: true, nuri: f.uri, npath: null, src: Cap.convertFileSrc(f.uri), name: f.name || 'Shared file',
       title: f.name ? baseName(f.name) : 'Shared file', size: f.size || 0, mtime: Date.now(), folder: 'Opened from other apps', dur: 0, thumb: null };
     lib.items.push(it); lib.byId.set(id, it);
   }
@@ -2436,6 +2482,7 @@ function migrateId(oldId, newId) {
 /* Remove an item from the app's lists. deleted=true also drops its history (the file is gone). */
 function forgetItem(it, deleted) {
   lib.items = lib.items.filter(i => i !== it); lib.byId.delete(it.id);
+  if (it.picked) { picked = picked.filter(p => 'pk:' + p.uri !== it.id); store.set('picked', picked); }
   if (it.url) URL.revokeObjectURL(it.url);
   if (deleted) {
     delete progress[it.id]; store.set('progress', progress);
@@ -2916,6 +2963,7 @@ importShared();
     await loadAppInfo();
     await refreshAccess();
     if (hasAccess('video') || hasAccess('audio')) { S.onboarded = true; saveSettings(); scanDevice(true); }
+    await restorePicked();
     try { const r = await ML.getLaunchFile(); if (r.file) handleOpenFile(r.file); } catch {}
   }
   if (!S.onboarded && (NATIVE || IS_ANDROID_BROWSER)) showOnboarding();
