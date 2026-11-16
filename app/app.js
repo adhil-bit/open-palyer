@@ -1,7 +1,7 @@
 /* Open Player — ad-free video & music player (web app + Android app).
    No ads, no tracking, nothing leaves the device. */
 
-const APP_VERSION = '1.7.4';
+const APP_VERSION = '1.7.5';
 // The website's download section: the APK link there comes with its checksum and signing fingerprint.
 const ANDROID_APK_URL = new URL('../#download', location.href).href;
 const VERIFY_URL = new URL('../#verify', location.href).href;
@@ -3343,7 +3343,17 @@ function deskAttach(it) {
     hls.loadSource(DESK.url('hls/index.m3u8', it.dpath, `&a=${aIdx}`));
     hls.attachMedia(P.v);
     hls.on(Hls.Events.MANIFEST_PARSED, () => P.v.play().catch(() => {}));
-    hls.on(Hls.Events.ERROR, (_e, d) => { if (d.fatal && P.hls === hls) { $('#spinner').hidden = true; ptoast('Couldn’t convert this file for playback', null, null, 6000); } });
+    let retries = 0;
+    hls.on(Hls.Events.ERROR, (_e, d) => {
+      if (!d.fatal || P.hls !== hls) return;
+      if (retries++ < 2) {                         // one bad segment shouldn't end playback
+        if (d.type === Hls.ErrorTypes.MEDIA_ERROR) { hls.recoverMediaError(); return; }
+        if (d.type === Hls.ErrorTypes.NETWORK_ERROR) { hls.startLoad(); return; }
+      }
+      $('#spinner').hidden = true;
+      P.deskErr = `${d.type} / ${d.details}${d.response?.code ? ' / HTTP ' + d.response.code : ''}${d.reason ? ' / ' + d.reason : ''}`;
+      ptoast('Couldn’t convert this file for playback', 'Details', () => sheetDeskDiag(it), 20000);
+    });
   } else P.v.src = DESK.url('file', it.dpath);
   onNativeTracks();
 }
@@ -3473,4 +3483,16 @@ async function sniffCodecs(it) {
     out.audio = (A.find(([k]) => txt.includes(k)) || [, ''])[1];
   } catch {}
   return out;
+}
+async function sheetDeskDiag(it) {
+  let d; try { d = await DESK.diag(it?.dpath); } catch (e) { d = { error: String(e) }; }
+  const text = [`Open Player desktop ${d.app || ''} (${d.os || ''})`, `Player error: ${P.deskErr || '-'}`,
+    `FFmpeg: ${d.ffmpegOk === false ? 'NOT WORKING' : d.ffmpegOk ? 'ok' : 'unknown'} ${d.version || ''}`, `FFmpeg path: ${d.ffmpeg || ''}`,
+    `File: ${d.file || ''}`, `Readable: ${d.allowed}`,
+    `Probe: ${d.probe ? JSON.stringify({ duration: d.probe.duration, video: d.probe.video?.codec, tenBit: d.probe.video?.tenBit, audio: (d.probe.audio || []).map(a => a.codec), subs: (d.probe.subs || []).map(x => x.codec), error: d.probe.error }) : '-'}`,
+    '', ...(d.last || [])].join('\n');
+  const b = openSheet('Playback details', `<p class="sheet-note">Copy this and send it to the developer to get the file working.</p>
+    <pre style="margin:0 20px 12px;padding:12px;background:var(--surface-2);border-radius:10px;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:46vh;overflow:auto">${esc(text)}</pre>
+    <div class="sheet-actions"><button class="btn primary" data-a="copy">Copy details</button></div>`);
+  b.onclick = async e => { if (!e.target.closest('[data-a="copy"]')) return; try { await navigator.clipboard.writeText(text); snack('Copied'); } catch { snack('Select the text and copy it'); } };
 }

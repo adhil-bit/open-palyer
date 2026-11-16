@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('OPDesktop', {
   probe: p => ipcRenderer.invoke('probe', p),
   exists: paths => ipcRenderer.invoke('exists', paths),
   pick: () => ipcRenderer.invoke('pick'),
+  diag: p => ipcRenderer.invoke('diag', p),
   fullscreen: on => ipcRenderer.invoke('fullscreen', on),
   // Calls fn with files opened from the file manager: first the ones waiting since launch, then later ones.
   onOpenFiles(fn) {

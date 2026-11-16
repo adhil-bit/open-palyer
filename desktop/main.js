@@ -19,6 +19,22 @@ protocol.registerSchemesAsPrivileged([{
   privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true },
 }]);
 
+/* ---------------- diagnostics (shown by the player's "Details" button) ---------------- */
+const diag = { ffmpeg: FFMPEG, ffmpegOk: null, version: '', last: [] };
+function note(what, text) {
+  diag.last.unshift(`[${new Date().toISOString().slice(11, 19)}] ${what}\n${String(text || '').trim().slice(-1500)}`);
+  diag.last.length = Math.min(diag.last.length, 6);
+}
+function checkFfmpeg() {
+  try {
+    const p = spawn(FFMPEG, ['-hide_banner', '-version'], { windowsHide: true });
+    let out = '';
+    p.stdout.on('data', d => { out += d; });
+    p.on('error', e => { diag.ffmpegOk = false; note('FFmpeg could not start', `${FFMPEG}\n${e.message}`); });
+    p.on('close', code => { if (diag.ffmpegOk !== false) { diag.ffmpegOk = code === 0; diag.version = out.split('\n')[0]; } });
+  } catch (e) { diag.ffmpegOk = false; note('FFmpeg could not start', e.message); }
+}
+
 /* ---------------- probing ---------------- */
 const probeCache = new Map();
 function runFfmpeg(args, { timeout = 20000 } = {}) {
@@ -37,6 +53,7 @@ async function probe(file) {
   const key = `${file}|${st.size}|${st.mtimeMs}`;
   if (probeCache.has(key)) return probeCache.get(key);
   const out = await runFfmpeg(['-hide_banner', '-i', file]);
+  if (!/Duration:/.test(out)) note('Probe found no media info: ' + path.basename(file), out);
   const r = { duration: 0, video: null, audio: [], subs: [], size: st.size };
   const d = out.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
   if (d) r.duration = +d[1] * 3600 + +d[2] * 60 + parseFloat(d[3]);
@@ -109,7 +126,10 @@ function playlist(file, audio, duration) {
 
 function streamProc(args, type) {
   const p = spawn(FFMPEG, args, { windowsHide: true });
-  p.stderr.on('data', () => {});
+  let err = '';
+  p.stderr.on('data', d => { if (err.length < 20000) err += d; });
+  p.on('error', e => note('FFmpeg could not start', e.message));
+  p.on('close', code => { if (code && code !== 255 && !p.killed) note(`FFmpeg exited with ${code}: ${args.filter(a => !String(a).includes(path.sep)).slice(0, 40).join(' ')}`, err); });
   const body = Readable.toWeb(p.stdout);
   return { p, res: new Response(body, { headers: { 'content-type': type, 'cache-control': 'no-store' } }) };
 }
@@ -137,7 +157,7 @@ async function handle(req) {
     const types = { html: 'text/html', js: 'text/javascript', css: 'text/css', svg: 'image/svg+xml', png: 'image/png', webmanifest: 'application/manifest+json', json: 'application/json' };
     return new Response(fs.readFileSync(f), { headers: { 'content-type': types[ext] || 'application/octet-stream' } });
   }
-  if (!okPath(file)) return new Response('Not allowed', { status: 403 });
+  if (!okPath(file)) { note('Blocked or missing file', `${file}\nallowed: ${allowed.has(path.resolve(file || '.'))}, exists: ${!!file && fs.existsSync(file)}`); return new Response('Not allowed', { status: 403 }); }
   try {
     if (u.pathname === '/file') return serveFile(file, req);
     if (u.pathname === '/hls/index.m3u8') {
@@ -154,6 +174,7 @@ async function handle(req) {
       return streamProc(['-hide_banner', '-loglevel', 'error', '-i', file, '-map', `0:s:${+u.searchParams.get('s') || 0}`, '-c:s', 'srt', '-f', 'srt', 'pipe:1'], 'text/plain; charset=utf-8').res;
     }
   } catch (e) {
+    note('Request failed: ' + u.pathname, e?.stack || e);
     return new Response(String(e?.message || e), { status: 500 });
   }
   return new Response('Not found', { status: 404 });
@@ -206,7 +227,13 @@ else {
       r.filePaths.forEach(allow);
       return r.filePaths.map(p => { const s = fs.statSync(p); return { path: p, name: path.basename(p), size: s.size, mtime: s.mtimeMs }; });
     });
+    ipcMain.handle('diag', async (_e, p) => {
+      let info = null;
+      if (p) { allow(p); try { info = await probe(p); } catch (e) { info = { error: e.message }; } }
+      return { app: app.getVersion(), os: `${process.platform} ${process.arch}`, ...diag, file: p || null, allowed: p ? allowed.has(path.resolve(p)) : null, probe: info };
+    });
     ipcMain.handle('fullscreen', (_e, on) => { if (win) win.setFullScreen(!!on); });
+    checkFfmpeg();
     sendOpen(mediaArgs(process.argv));
     createWindow();
   });
