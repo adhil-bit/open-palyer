@@ -1,0 +1,18 @@
+{
+  "version": "1.6.25",
+  "apk": "OpenPlayer-1.6.25.apk",
+  "download": "/download/android",
+  "size": 26739951,
+  "sha256": "57a4f5d3c5374c31e357d3cea4c57391246515173bfc8a9bf8a4979e7cea9945",
+  "certSha256": "57:DD:44:FB:86:09:96:FC:D2:84:A9:CD:41:D2:17:4E:4B:51:F7:DD:7E:58:98:B8:A9:48:E1:CF:77:C8:9C:0F",
+  "date": "2026-11-25T16:47:43Z",
+  "virustotal": {
+    "status": "skipped",
+    "link": "",
+    "flagged": null,
+    "engines": null
+  },
+  "attestation": "https://github.com/adhil-bit/open-palyer/attestations/72258887",
+  "release": "https://github.com/adhil-bit/open-palyer/releases/tag/v1.6.25",
+  "commit": "407ce9ae0e9e0452b8932cbe5a31305c045e7de4"
+}
