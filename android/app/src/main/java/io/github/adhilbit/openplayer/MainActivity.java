@@ -17,6 +17,9 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativePlayerPlugin.class);
         super.onCreate(savedInstanceState);
 
+        // Correct "Range" answers for local files, so seeking works in the built-in video engine.
+        if (getBridge() != null) getBridge().setWebViewClient(new RangeWebViewClient(getBridge()));
+
         // Tell the page how tall the status bar and navigation buttons are. Many WebViews report 0 for
         // CSS env(safe-area-inset-*), so the list ran under the navigation buttons.
         WebView w = getBridge() != null ? getBridge().getWebView() : null;
