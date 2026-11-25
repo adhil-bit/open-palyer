@@ -553,3 +553,7 @@ body.kids #mini { display: none !important; }
 .perr-acts { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 18px; }
 .perr-acts .btn { min-width: 120px; justify-content: center; }
 .perr-acts .btn.link { background: none; color: var(--muted); min-width: 0; }
+
+/* Android: a dark strip behind the system navigation buttons so they stay readable over the list */
+body::after { content: ''; position: fixed; left: 0; right: 0; bottom: 0; height: var(--safe-b); background: var(--bg); opacity: .94; z-index: 70; pointer-events: none; }
+body:has(#player:not([hidden]))::after { display: none; }

@@ -835,7 +835,7 @@ class NativeVideo extends EventTarget {
   _fire(type) { this.dispatchEvent(new Event(type)); }
   openItem(item, startAt) {
     Object.assign(this, {
-      _t: startAt || 0, _d: NaN, _paused: false, _buf: 0, videoWidth: 0, videoHeight: 0,
+      _t: startAt || 0, _d: NaN, _paused: false, _buf: 0, videoWidth: 0, videoHeight: 0, seekable: null,
       readyState: 0, error: null, tracks: [], _src: item.src || '', _open: true,
     });
     NP.open({ path: item.npath || null, uri: item.nuri || null, startMs: Math.round((startAt || 0) * 1000), play: true })
@@ -850,6 +850,7 @@ class NativeVideo extends EventTarget {
   set currentTime(t) {
     t = Math.max(0, +t || 0);
     if (isFinite(this._d)) t = Math.min(t, Math.max(0, this._d - 0.05));
+    if (this.seekable === false) { this._fire('unseekable'); return; }   // the file has no seek index
     this._t = t;
     NP.seek({ ms: Math.round(t * 1000) }).then(() => this._fire('seeked')).catch(() => {});
     this._fire('timeupdate');
@@ -879,6 +880,7 @@ class NativeVideo extends EventTarget {
     if (!this._open || !e) return;
     switch (e.type) {
       case 'meta':
+        if (typeof e.seekable === 'boolean') this.seekable = e.seekable;
         if (e.duration > 0) this._d = e.duration / 1000;
         if (e.width) { this.videoWidth = e.width; this.videoHeight = e.height; }
         this.readyState = 4;
@@ -888,6 +890,7 @@ class NativeVideo extends EventTarget {
         this.videoWidth = e.width; this.videoHeight = e.height; this._fire('resize');
         break;
       case 'state': {
+        if (typeof e.seekable === 'boolean') this.seekable = e.seekable;
         if (e.duration > 0 && !(this._d > 0)) { this._d = e.duration / 1000; this._fire('durationchange'); }
         this._ended = e.state === 'ended';
         const paused = !e.playWhenReady || this._ended;
@@ -912,6 +915,12 @@ class NativeVideo extends EventTarget {
 }
 P.webV = P.v;
 P.nv = NP ? new NativeVideo() : null;
+// A file the player can't jump around in (rare after the MKV fix): say so instead of doing nothing.
+P.nv?.addEventListener('unseekable', () => {
+  if (Date.now() - (P.unseekToast || 0) < 4000) return;
+  P.unseekToast = Date.now();
+  ptoast('This file can only play from start to end. It has no seek index, often because it isn’t fully downloaded.', null, null, 4200);
+});
 P.engineFor = {};      // item id → 'native' | 'web', chosen by the user or by an automatic fallback
 P.vol = 1;
 if (P.nv) {
@@ -1171,6 +1180,20 @@ $('#miniOpen').onclick = () => {
 $('#miniPlay').onclick = () => { togglePlay(); setTimeout(updateMini, 50); };
 $('#miniNext').onclick = () => { next(); setTimeout(updateMini, 300); };
 $('#miniClose').onclick = () => { P.v.pause(); clearSleep(); hideMini(); render(); };
+/* Android Back button (MainActivity asks this): one step back inside the app, never straight out. */
+window.OPBack = () => {
+  try {
+    if (!sheet.hidden) { closeSheet(); return 'handled'; }
+    if (!P.el.hidden) {
+      if (P.locked) { flashUnlock?.(); return 'handled'; }
+      closePlayer(); return 'handled';
+    }
+    if (!$('#searchbar').hidden) { $('#btnSearchClose').click(); return 'handled'; }
+    if (!$('#crumb').hidden) { $('#btnCrumbBack').click(); return 'handled'; }
+    if (!$('#mini').hidden && P.v && !P.v.paused) return 'background';   // keep the music playing
+    return 'exit';
+  } catch { return 'exit'; }
+};
 window.addEventListener('popstate', () => {
   if (!sheet.hidden) { closeSheet(); if (!P.el.hidden) history.pushState({ player: 1 }, ''); return; }
   if (!P.el.hidden) closePlayer(true);
@@ -1178,7 +1201,8 @@ window.addEventListener('popstate', () => {
 
 const togglePlay = () => (P.v.paused ? P.v.play().catch(() => {}) : P.v.pause());
 function seekBy(s) {
-  const v = P.v; if (!isFinite(v.duration)) return;
+  const v = P.v;
+  if (!isFinite(v.duration)) { if (v.isNative) v.currentTime = Math.max(0, v.currentTime + s); return; }
   v.currentTime = clamp(v.currentTime + s, 0, v.duration - 0.1);
 }
 function next() { if (P.idx < P.queue.length - 1) { P.idx++; load(P.queue[P.idx]); } }

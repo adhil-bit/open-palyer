@@ -207,7 +207,8 @@ public class NativePlayerPlugin extends Plugin {
         if (player != null) return;
         Context ctx = getContext();
         DefaultDataSource.Factory data = new DefaultDataSource.Factory(ctx);
-        DefaultMediaSourceFactory media = new DefaultMediaSourceFactory(ctx, new FfmpegSubtitleExtractorsFactory());
+        // MkvSeekFix: MKV files without a seek index (Cues) become seekable.
+        DefaultMediaSourceFactory media = new DefaultMediaSourceFactory(ctx, new MkvSeekFix(ctx, new FfmpegSubtitleExtractorsFactory()));
         media.setDataSourceFactory(data);
         MediaSource.Factory sources = FfmpegSubtitleSourceKt.withFfmpegSubtitles(media, data);
         NextRenderersFactory renderers = new NextRenderersFactory(ctx);
@@ -549,6 +550,7 @@ public class NativePlayerPlugin extends Plugin {
                 JSObject o = new JSObject();
                 o.put("type", "meta");
                 o.put("duration", player.getDuration() == C.TIME_UNSET ? -1 : player.getDuration());
+                o.put("seekable", player.isCurrentMediaItemSeekable());
                 o.put("width", vs.width);
                 o.put("height", vs.height);
                 emit(o);
@@ -622,6 +624,7 @@ public class NativePlayerPlugin extends Plugin {
         o.put("playing", player.isPlaying());
         o.put("position", player.getCurrentPosition());
         o.put("duration", player.getDuration() == C.TIME_UNSET ? -1 : player.getDuration());
+        o.put("seekable", player.isCurrentMediaItemSeekable());
         emit(o);
     }
 
