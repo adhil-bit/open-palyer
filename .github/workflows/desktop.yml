@@ -91,6 +91,20 @@ jobs:
             echo '```'
           } > ../notes.md
       - name: Publish to the "desktop" release
+        id: publish
+        continue-on-error: true   # GitHub's API sometimes fails briefly; try once more below
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: desktop
+          name: Open Player for desktop
+          body_path: notes.md
+          make_latest: false
+          files: files/*
+      - name: Publish again after a short wait
+        if: steps.publish.outcome == 'failure'
+        run: sleep 30
+      - name: Publish (second try)
+        if: steps.publish.outcome == 'failure'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: desktop
