@@ -147,6 +147,10 @@ function addFiles(fileList, fromFolder = false) {
 
 /* ---------------- Android app: scan the whole device ---------------- */
 let scanning = false, lastScan = 0;
+/* true from launch until the first look through the phone's library finishes: show the shimmer, not "No videos" */
+let libLoading = !!(NATIVE || DESK);
+function libLoaded() { if (!libLoading) return; libLoading = false; render(); hydrateThumbs(); }
+setTimeout(libLoaded, 10000);   // never shimmer forever (no permission yet, onboarding, errors)
 async function scanDevice(quiet) {
   if (!NATIVE || scanning) return;
   scanning = true; lastScan = Date.now();
@@ -188,7 +192,7 @@ async function scanDevice(quiet) {
     if (S.deepScan && allFiles) deepScan(true);
   } catch (e) {
     if (!quiet) snack('Couldn’t read your media library');
-  } finally { scanning = false; }
+  } finally { scanning = false; libLoaded(); }
 }
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const cleanTag = s => (!s || s === '<unknown>') ? '' : s;
@@ -259,7 +263,7 @@ const audioItems = () => lib.items.filter(i => isAudio(i) && !privateIds.has(i.i
 lib.musicView = 'songs';   // songs | albums | artists
 lib.group = null;          // selected album/artist
 
-function sortItems(arr, ctx = sortCtx()) { return sortBy(arr, ctx === 'songs' ? 'songs' : 'videos'); }
+function sortItems(arr, ctx = sortCtx()) { return sortBy(arr, ctx === 'songs' ? 'songs' : ctx === 'infolder' ? 'infolder' : 'videos'); }
 function matchQuery(i) {
   if (!lib.query) return true;
   const q = lib.query.toLowerCase();
@@ -380,6 +384,7 @@ function render() {
 
   if (lib.tab === 'music') {
     const songs = audioItems();
+    if (!songs.length && libLoading) { showSkeleton(); return; }
     if (!songs.length) {
       listEl.innerHTML = `<div class="empty" style="position:static;padding:50px 24px">
         <div class="empty-art"><svg><use href="#i-music"/></svg></div><h2>No music yet</h2>
@@ -422,7 +427,10 @@ function render() {
   }
   const vids = videoItems();
   const showPriv = lib.tab === 'folders' && !lib.folder && !lib.query && (pinRec || privateIds.size);
-  if (!vids.length && !showPriv) { $('#empty').hidden = false; listEl.innerHTML = ''; return; }
+  if (!vids.length && !showPriv) {
+    if (libLoading) { showSkeleton(); return; }
+    $('#empty').hidden = false; listEl.innerHTML = ''; return;
+  }
   if (lib.tab === 'folders' && !lib.folder && !lib.query) {
     if (showPriv) html += `<button class="row" data-private="1">
         <div class="folder-ico priv"><svg><use href="#i-lock"/></svg></div>
@@ -2425,15 +2433,16 @@ function askText(title, value = '', { placeholder = '', ok = 'Save', suffix = ''
 const SORT_OPTS = {
   folders: [['name', 'Name'], ['date', 'Newest video'], ['size', 'Total size'], ['count', 'Number of videos']],
   videos: [['name', 'Name'], ['date', 'Date modified'], ['size', 'Size'], ['duration', 'Length']],
+  infolder: [['date', 'Date modified'], ['name', 'Name'], ['size', 'Size'], ['duration', 'Length']],
   recent: [['played', 'Last played'], ['name', 'Name'], ['date', 'Date modified'], ['size', 'Size'], ['duration', 'Length']],
   songs: [['name', 'Title'], ['artist', 'Artist'], ['date', 'Date added'], ['size', 'Size'], ['duration', 'Length']],
   groups: [['name', 'Name'], ['count', 'Number of songs']],
   playlist: [['custom', 'Playlist order'], ['name', 'Name'], ['date', 'Date modified'], ['duration', 'Length']],
   plists: [['name', 'Name'], ['date', 'Last changed'], ['count', 'Number of items']],
 };
-const SORT_TITLES = { folders: 'Sort folders', videos: 'Sort videos', recent: 'Sort recent', songs: 'Sort songs', groups: 'Sort', playlist: 'Sort playlist', plists: 'Sort playlists' };
+const SORT_TITLES = { folders: 'Sort folders', videos: 'Sort videos', infolder: 'Sort this folder', recent: 'Sort recent', songs: 'Sort songs', groups: 'Sort', playlist: 'Sort playlist', plists: 'Sort playlists' };
 S.sorts = Object.assign({
-  folders: { k: 'name', d: 1 }, videos: { k: S.sort || 'name', d: S.sortDir || 1 }, recent: { k: 'played', d: -1 },
+  folders: { k: 'name', d: 1 }, videos: { k: S.sort || 'name', d: S.sortDir || 1 }, infolder: { k: 'date', d: -1 }, recent: { k: 'played', d: -1 },
   songs: { k: 'name', d: 1 }, groups: { k: 'name', d: 1 }, playlist: { k: 'custom', d: 1 }, plists: { k: 'date', d: -1 },
 }, S.sorts || {});
 function sortCtx() {
@@ -2441,6 +2450,7 @@ function sortCtx() {
   if (lib.tab === 'playlists') return lib.playlist ? 'playlist' : 'plists';
   if (lib.tab === 'music') return (lib.musicView !== 'songs' && !lib.group && !lib.query) ? 'groups' : 'songs';
   if (lib.tab === 'folders' && !lib.folder && !lib.query) return 'folders';
+  if (lib.tab === 'folders' && lib.folder && lib.folder !== PRIV) return 'infolder';   // newest first by default
   return 'videos';
 }
 const nameOf = x => String(x.title || x.name || '');
@@ -3101,7 +3111,7 @@ setupSW();
 importShared();
 (async () => {
   if (DESK) {
-    await deskRestore();
+    await deskRestore(); libLoaded();
     DESK.onOpenFiles(files => { const its = deskAddPaths(files.map(p => ({ path: p })), 'Opened files'); if (its[0]) { if (!P.el.hidden) closePlayer(true); openPlayer(its[0], its.filter(i => i.kind === its[0].kind)); } });
   }
   if (NATIVE) {
