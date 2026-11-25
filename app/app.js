@@ -314,6 +314,41 @@ function updateRow(it) {
   if (P.item === it) updateMini();
 }
 const emptyMsg = t => `<div class="empty" style="position:static;padding:60px 24px"><p>${t}</p></div>`;
+/* Long lists (thousands of songs) are built a screenful at a time: the first rows appear at once,
+   more are added as you scroll. Building every row at once froze the app on big libraries. */
+const ROWS_FIRST = 50, ROWS_MORE = 50;
+let moreObs = null;
+function paintRows(head, rows, empty = '') {
+  listEl._rows = rows; listEl._shown = Math.min(rows.length, ROWS_FIRST);
+  listEl.innerHTML = head + (rows.length ? rows.slice(0, listEl._shown).join('') : empty) +
+    (rows.length > listEl._shown ? '<div class="more-rows" id="moreRows"></div>' : '');
+  watchMore();
+}
+function watchMore() {
+  moreObs?.disconnect();
+  const sentinel = $('#moreRows'); if (!sentinel) return;
+  moreObs = new IntersectionObserver(es => {
+    if (!es.some(e => e.isIntersecting)) return;
+    const rows = listEl._rows || [], from = listEl._shown, to = Math.min(rows.length, from + ROWS_MORE);
+    sentinel.insertAdjacentHTML('beforebegin', rows.slice(from, to).join(''));
+    listEl._shown = to;
+    if (to >= rows.length) { moreObs.disconnect(); sentinel.remove(); }
+    hydrateThumbs();
+  }, { root: listEl, rootMargin: '1200px 0px' });
+  moreObs.observe(sentinel);
+}
+/* shimmer placeholder shown for the moment between tapping a tab and the list appearing */
+function showSkeleton() {
+  moreObs?.disconnect();
+  const row = '<div class="row skel"><div class="thumb"></div><div class="meta"><i></i><i></i></div></div>';
+  listEl.innerHTML = '<div class="skel-list" aria-hidden="true">' + row.repeat(8) + '</div>';
+}
+let renderQueued = 0;
+function renderSoon() {   // paint the shimmer now, build the list on the next frame
+  showSkeleton();
+  cancelAnimationFrame(renderQueued);
+  renderQueued = requestAnimationFrame(() => { renderQueued = requestAnimationFrame(() => { render(); listEl.scrollTop = 0; hydrateThumbs(); }); });
+}
 function render() {
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === lib.tab));
   const showCrumb = (lib.tab === 'folders' && lib.folder) || (lib.tab === 'music' && lib.group) || (lib.tab === 'playlists' && lib.playlist);
@@ -330,16 +365,16 @@ function render() {
     const list = sortBy(recents
       .filter(r => !privateIds.has(r.id) && (!lib.query || r.name.toLowerCase().includes(lib.query.toLowerCase())))
       .map(r => { const it = lib.byId.get(r.id); return { r, it, name: it?.name || r.name, title: it?.title, mtime: it?.mtime || 0, size: it?.size || r.size || 0, dur: it?.dur || progress[r.id]?.d || 0, played: r.ts }; }), 'recent');
-    if (!list.length) html = emptyMsg('Videos and songs you play show up here.');
+    const rows = [];
     for (const { r, it } of list) {
-      if (it) { html += rowHTML(it); continue; }
+      if (it) { rows.push(rowHTML(it)); continue; }
       const p = progress[r.id]; const pct = p && p.d ? clamp(p.t / p.d * 100, 0, 100) : 0;
-      html += `<button class="row missing" data-recent="${esc(r.id)}">
+      rows.push(`<button class="row missing" data-recent="${esc(r.id)}">
         <div class="thumb ph"><svg><use href="#i-film"/></svg>${pct > 1 ? `<span class="prog"><i style="width:${pct}%"></i></span>` : ''}</div>
         <div class="meta"><div class="name">${esc(r.name)}</div><div class="sub"><span>${p ? fmtTime(p.t) + ' / ' + fmtTime(p.d) : ''}</span><span>Tap to re-open</span></div></div>
-      </button>`;
+      </button>`);
     }
-    listEl.innerHTML = html;
+    paintRows('', rows, emptyMsg('Videos and songs you play show up here.'));
     return;
   }
 
@@ -360,18 +395,20 @@ function render() {
         g.n++; if (!g.art && s.thumb) g.art = s.thumb;
         groups.set(s[key], g);
       }
+      const rows = [];
       for (const g of sortBy([...groups.values()], 'groups')) {
         const name = g.name;
-        html += `<button class="row" data-group="${esc(name)}">
+        rows.push(`<button class="row" data-group="${esc(name)}">
           <div class="art${key === 'artist' ? ' round' : ''}${g.art ? '' : ' ph'}">${g.art ? `<img src="${g.art}" alt="" loading="lazy">` : `<svg><use href="#${key === 'album' ? 'i-disc' : 'i-user'}"/></svg>`}</div>
           <div class="meta"><div class="name">${esc(name)}</div><div class="sub"><span>${key === 'album' ? esc(g.artist || '') + ' · ' : ''}${g.n} song${g.n > 1 ? 's' : ''}</span></div></div>
-          <svg class="chev"><use href="#i-chev"/></svg></button>`;
+          <svg class="chev"><use href="#i-chev"/></svg></button>`);
       }
+      paintRows('', rows);
     } else {
       const items = visibleItems();
-      html = items.length ? `<button class="playall" data-act="playall"><svg><use href="#i-play"/></svg>Play all · ${items.length}</button>` + items.map(songRowHTML).join('') : emptyMsg('No matches.');
+      paintRows(items.length ? `<button class="playall" data-act="playall"><svg><use href="#i-play"/></svg>Play all · ${items.length}</button>` : '',
+        items.map(songRowHTML), emptyMsg('No matches.'));
     }
-    listEl.innerHTML = html;
     return;
   }
 
@@ -379,8 +416,8 @@ function render() {
   if (lib.tab === 'folders' && lib.folder === PRIV) {
     if (!privUnlocked) { lib.folder = null; return render(); }
     const items = visibleItems();
-    listEl.innerHTML = `<div class="privnote"><svg><use href="#i-lock"/></svg>Only you can see these, and they lock again when you leave.</div>` +
-      (items.map(rowHTML).join('') || emptyMsg('Nothing here yet. Long-press any video or song and choose “Move to Private”.'));
+    paintRows(`<div class="privnote"><svg><use href="#i-lock"/></svg>Only you can see these, and they lock again when you leave.</div>`,
+      items.map(rowHTML), emptyMsg('Nothing here yet. Long-press any video or song and choose “Move to Private”.'));
     return;
   }
   const vids = videoItems();
@@ -408,9 +445,10 @@ function render() {
       </button>`;
     }
   } else {
-    html = visibleItems().map(rowHTML).join('') || emptyMsg('No matches.');
+    paintRows('', visibleItems().map(rowHTML), emptyMsg('No matches.'));
+    return;
   }
-  listEl.innerHTML = html;
+  paintRows(html, []);
 }
 function renderPlaylists() {
   const pl = lib.playlist && plById(lib.playlist);
@@ -501,7 +539,9 @@ $$('#musicChips button').forEach(b => b.onclick = () => { lib.musicView = b.data
 /* tabs, search, sort, pickers */
 $$('.tab').forEach(t => t.onclick = () => {
   if (lib.folder === PRIV) privUnlocked = false;
-  lib.tab = t.dataset.tab; lib.folder = null; lib.group = null; lib.playlist = null; render(); listEl.scrollTop = 0; hydrateThumbs();
+  lib.tab = t.dataset.tab; lib.folder = null; lib.group = null; lib.playlist = null;
+  $$('.tab').forEach(x => x.classList.toggle('active', x === t));
+  renderSoon();
 });
 $('#btnCrumbBack').onclick = () => { if (lib.folder === PRIV) privUnlocked = false; lib.folder = null; lib.group = null; lib.playlist = null; render(); };
 $('#btnSearch').onclick = () => { $('#searchbar').hidden = false; $('#searchInput').focus(); };
@@ -1094,7 +1134,10 @@ function onPlayState() {
   if (navigator.mediaSession) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
   if (playing) P.unplugAt = 0;
   updateMini();
-  if (P.item?.kind === 'audio' && P.el.hidden) render();
+  if (P.item?.kind === 'audio' && P.el.hidden) {
+    listEl.querySelectorAll('.row.song.playing').forEach(r => { const it = lib.byId.get(r.dataset.id); if (it && it !== P.item) r.outerHTML = songRowHTML(it); });
+    updateRow(P.item);
+  }
   if (playing) { keepAwake(true); scheduleHide(); } else { keepAwake(false); showControls(true); saveProgress(true); }
 }
 function onEnded() {
@@ -3067,6 +3110,17 @@ importShared();
   if (!S.onboarded && (NATIVE || IS_ANDROID_BROWSER)) showOnboarding();
 })();
 if (store.get('justRefreshed', false)) { store.del('justRefreshed'); setTimeout(() => snack('App cache refreshed — you’re on the latest files'), 300); }
+/* Android: real heights of the status bar and navigation buttons (CSS env() is often 0 in the app) */
+async function syncInsets() {
+  if (!NATIVE || !ML.getInsets) return;
+  try {
+    const r = await ML.getInsets();
+    if (r.bottom >= 0) document.documentElement.style.setProperty('--nav-b', r.bottom + 'px');
+    if (r.top >= 0) document.documentElement.style.setProperty('--nav-t', r.top + 'px');
+  } catch {}
+}
+syncInsets(); setTimeout(syncInsets, 800);
+window.addEventListener('resize', () => setTimeout(syncInsets, 150));
 window.OpenPlayer = { lib, P, S, version: APP_VERSION, get playlists() { return playlists; }, privateIds, detectEncoding, progress };
 
 /* =================================================================

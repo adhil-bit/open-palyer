@@ -44,6 +44,8 @@ import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
@@ -913,6 +915,24 @@ public class MediaLibraryPlugin extends Plugin {
             if (on) a.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             else a.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             call.resolve();
+        });
+    }
+
+    /** Heights of the status bar and navigation buttons, in CSS pixels. */
+    @PluginMethod
+    public void getInsets(PluginCall call) {
+        Activity a = getActivity();
+        if (a == null) { call.reject("No activity"); return; }
+        a.runOnUiThread(() -> {
+            JSObject o = new JSObject();
+            WindowInsetsCompat w = ViewCompat.getRootWindowInsets(a.getWindow().getDecorView());
+            float d = a.getResources().getDisplayMetrics().density;
+            if (w != null) {
+                Insets b = w.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                o.put("top", Math.round(b.top / d));
+                o.put("bottom", Math.round(b.bottom / d));
+            } else { o.put("top", 0); o.put("bottom", 0); }
+            call.resolve(o);
         });
     }
 

@@ -9,8 +9,8 @@
   --accent-ink: #ffffff;
   --good: #46d39a;
   --radius: 14px;
-  --safe-t: env(safe-area-inset-top, 0px);
-  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: max(env(safe-area-inset-top, 0px), var(--nav-t, 0px));
+  --safe-b: max(env(safe-area-inset-bottom, 0px), var(--nav-b, 0px));
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
   color-scheme: dark;
@@ -561,3 +561,13 @@ body:has(#player:not([hidden]))::after { display: none; }
 /* mini bar: a wider picture for videos (live preview) */
 .mini .art.vid { width: 80px; height: 45px; border-radius: 7px; background: #000; overflow: hidden; }
 .mini .art.vid canvas, .mini .art.vid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* shimmer while a list is being built */
+.skel-list .row.skel { pointer-events: none; }
+.row.skel .thumb, .row.skel .meta i { background: linear-gradient(90deg, rgba(255,255,255,.05) 25%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.05) 75%); background-size: 200% 100%; animation: shimmer 1.1s linear infinite; border-radius: 8px; }
+.row.skel .meta { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.row.skel .meta i { display: block; height: 14px; width: 80%; }
+.row.skel .meta i + i { width: 45%; height: 11px; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .row.skel .thumb, .row.skel .meta i { animation: none; } }
+.more-rows { height: 1px; }
