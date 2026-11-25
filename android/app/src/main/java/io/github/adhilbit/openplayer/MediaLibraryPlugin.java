@@ -64,6 +64,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -88,6 +90,12 @@ import java.util.Set;
     }
 )
 public class MediaLibraryPlugin extends Plugin {
+    // Capacitor runs every plugin call on one shared thread. Long jobs (reading the whole library,
+    // making thumbnails, searching hidden folders) used to block it, so opening a video waited behind
+    // them for seconds. They now run on their own threads.
+    private static final ExecutorService LIBRARY = Executors.newSingleThreadExecutor();
+    private static final ExecutorService THUMBS = Executors.newFixedThreadPool(2);
+
 
     private static final boolean MODERN = Build.VERSION.SDK_INT >= 33;
 
@@ -263,7 +271,9 @@ public class MediaLibraryPlugin extends Plugin {
 
     /** Walks shared storage and returns media files, including those in hidden or .nomedia folders. */
     @PluginMethod
-    public void deepScan(PluginCall call) {
+    public void deepScan(PluginCall call) { LIBRARY.execute(() -> { try { deepScanWork(call); } catch (Throwable t) { call.reject(String.valueOf(t)); } }); }
+
+    private void deepScanWork(PluginCall call) {
         if (!hasAllFiles()) { call.reject("All files access not granted"); return; }
         File root = Environment.getExternalStorageDirectory();
         JSArray items = new JSArray();
@@ -640,7 +650,9 @@ public class MediaLibraryPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void listVideos(PluginCall call) {
+    public void listVideos(PluginCall call) { LIBRARY.execute(() -> { try { listVideosWork(call); } catch (Throwable t) { call.reject(String.valueOf(t)); } }); }
+
+    private void listVideosWork(PluginCall call) {
         Uri coll = Build.VERSION.SDK_INT >= 29
             ? MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
             : MediaStore.Video.Media.EXTERNAL_CONTENT_URI;
@@ -676,7 +688,9 @@ public class MediaLibraryPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void listAudio(PluginCall call) {
+    public void listAudio(PluginCall call) { LIBRARY.execute(() -> { try { listAudioWork(call); } catch (Throwable t) { call.reject(String.valueOf(t)); } }); }
+
+    private void listAudioWork(PluginCall call) {
         Uri coll = Build.VERSION.SDK_INT >= 29
             ? MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
             : MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
@@ -716,7 +730,9 @@ public class MediaLibraryPlugin extends Plugin {
     /* ---------------- thumbnails / album art ---------------- */
 
     @PluginMethod
-    public void getThumbnail(PluginCall call) {
+    public void getThumbnail(PluginCall call) { THUMBS.execute(() -> { try { getThumbnailWork(call); } catch (Throwable t) { call.reject(String.valueOf(t)); } }); }
+
+    private void getThumbnailWork(PluginCall call) {
         String uriStr = call.getString("uri");
         String path = call.getString("path");
         boolean audio = Boolean.TRUE.equals(call.getBoolean("audio", false));
@@ -841,7 +857,9 @@ public class MediaLibraryPlugin extends Plugin {
 
     /** Files picked earlier: still readable? (permission can be lost if the file is moved). */
     @PluginMethod
-    public void checkUris(PluginCall call) {
+    public void checkUris(PluginCall call) { LIBRARY.execute(() -> { try { checkUrisWork(call); } catch (Throwable t) { call.reject(String.valueOf(t)); } }); }
+
+    private void checkUrisWork(PluginCall call) {
         JSArray in = call.getArray("uris");
         JSArray ok = new JSArray();
         if (in != null) {

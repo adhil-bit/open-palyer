@@ -59,6 +59,8 @@ import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -75,6 +77,9 @@ import java.util.Set;
 @OptIn(markerClass = UnstableApi.class)
 @CapacitorPlugin(name = "NativePlayer")
 public class NativePlayerPlugin extends Plugin {
+    // Off Capacitor's shared plugin thread, so a slow probe can't delay play/seek/pause.
+    private static final ExecutorService PROBE = Executors.newSingleThreadExecutor();
+
 
     private static final Set<String> WEB_AUDIO = new HashSet<>(Arrays.asList(
         "audio/mp4a-latm", "audio/mpeg", "audio/opus", "audio/vorbis", "audio/flac", "audio/raw"));
@@ -136,7 +141,9 @@ public class NativePlayerPlugin extends Plugin {
     /* ---------------- should this file use the native engine? ---------------- */
 
     @PluginMethod
-    public void probe(PluginCall call) {
+    public void probe(PluginCall call) { PROBE.execute(() -> { try { probeWork(call); } catch (Throwable t) { call.reject(String.valueOf(t)); } }); }
+
+    private void probeWork(PluginCall call) {
         String path = call.getString("path");
         String uri = call.getString("uri");
         String name = call.getString("name", path != null ? path : uri);

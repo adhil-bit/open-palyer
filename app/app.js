@@ -206,6 +206,9 @@ async function hydrateThumbs() {
   const order = [...lib.items].sort((a, b) => onScreen.has(b.id) - onScreen.has(a.id));
   for (const it of order) {
     if (it.thumb || it.thumbTried) continue;
+    // Let a video that's opening or playing have the phone to itself: making thumbnails reads big
+    // files and decodes frames, which slowed starting playback right after the app opened.
+    while (!P.el.hidden) await new Promise(r => setTimeout(r, 800));
     if (!it.file && !it.native && !it.dpath) continue;
     if (it.kind === 'audio' && !it.native && !it.dpath) continue;     // no artwork reader for manual songs
     it.thumbTried = true;
