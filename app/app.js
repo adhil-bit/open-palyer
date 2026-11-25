@@ -659,6 +659,8 @@ async function sheetSettings() {
     <div class="group">Playback</div>
     ${opt('resume', 'i-loop', 'Resume where you left off', `<span class="val">${resumeLbl[S.resume]}</span>`)}
     ${opt('autoNext', 'i-next', 'Auto-play next video', sw(S.autoNext))}
+    ${opt('bgPlay', 'i-pip', 'Keep playing after leaving the player<small>Back shows a mini player at the bottom, like MX Player</small>', sw(S.bgPlay !== false))}
+    ${opt('musicMini', 'i-note', 'Play songs in the mini player<small>Off: songs open the full music screen</small>', sw(S.musicMini !== false))}
     ${opt('autoFull', 'i-aspect', 'Full screen when a video starts<small>Off: plays in the window; use the full-screen button or press F</small>', sw(wantAutoFull()))}
     ${seg('seekStep', 'i-fwd', 'Skip amount', 'Double-tap and skip buttons', [[5, '5s'], [10, '10s'], [15, '15s'], [30, '30s']])}
     ${seg('gestureSens', 'i-hand', 'Gesture sensitivity', 'Swipes for seek, volume and brightness', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']])}
@@ -706,6 +708,8 @@ async function sheetSettings() {
     if (o === 'privacy') { closeSheet(); return sheetPrivacy(); }
     if (o === 'resume') S.resume = { always: 'ask', ask: 'never', never: 'always' }[S.resume];
     if (o === 'autoNext') S.autoNext = !S.autoNext;
+    if (o === 'bgPlay') S.bgPlay = S.bgPlay === false;
+    if (o === 'musicMini') S.musicMini = S.musicMini === false;
     if (o === 'autoFull') S.autoFull = !wantAutoFull();
     if (o === 'keepAwake') S.keepAwake = !S.keepAwake;
     if (o === 'rememberBright') S.rememberBright = !S.rememberBright;
@@ -932,12 +936,19 @@ if (P.nv) {
 
 const fmtRate = r => (Math.round(r * 100) / 100).toFixed(r % 0.25 ? 2 : (r % 1 ? 2 : 1)).replace(/0$/, '') + '×';
 
-function openPlayer(item, queue) {
+const playerLive = () => !P.el.hidden || !$('#mini').hidden;
+function openPlayer(item, queue, opts = {}) {
   P.queue = (queue && queue.length ? queue : [item]).slice();
   if (!P.queue.includes(item)) P.queue.unshift(item);
   P.origQueue = null;
   if (S.shuffle && P.queue.length > 1) { P.origQueue = P.queue.slice(); P.queue = [item, ...shuffled(P.queue.filter(x => x !== item))]; }
   P.idx = Math.max(0, P.queue.indexOf(item));
+  if (item.kind === 'audio' && !opts.full && S.musicMini !== false) {   // music: no full screen, just play
+    if (!P.el.hidden) closePlayer();
+    showMini();
+    load(item);
+    return;
+  }
   P.el.hidden = false;
   document.documentElement.style.background = '#000';
   hideMini();
@@ -969,13 +980,13 @@ function load(item, startAt) {
   const token = P.loadToken = (P.loadToken || 0) + 1;
   if (DESK && item.dpath) {
     saveProgress(true); P.v.pause(); $('#spinner').hidden = false;
-    deskProbe(item).then(() => { if (token === P.loadToken && !P.el.hidden) loadWith(item, startAt, 'web'); });
+    deskProbe(item).then(() => { if (token === P.loadToken && playerLive()) loadWith(item, startAt, 'web'); });
     return;
   }
   if (!P.nv || item.remote || !item.native) return loadWith(item, startAt, 'web');
   saveProgress(true); P.v.pause();
   $('#spinner').hidden = false;
-  chooseEngine(item).then(e => { if (token === P.loadToken && !P.el.hidden) loadWith(item, startAt, e); });
+  chooseEngine(item).then(e => { if (token === P.loadToken && playerLive()) loadWith(item, startAt, e); });
 }
 function loadWith(item, startAt, engine) {
   saveProgress(true);
@@ -1131,11 +1142,12 @@ function touchRecent(it) {
 
 function closePlayer(fromPop) {
   saveProgress(true);
-  const keepMusic = P.item?.kind === 'audio' && !P.v.paused;
+  const keepMusic = !!P.item && !P.v.paused && (P.item.kind === 'audio' || S.bgPlay !== false);
   if (!keepMusic) { P.v.pause(); clearSleep(); deskDetach(); }
   P.el.hidden = true; closeSheet(); hidePlayError();
   P.loadToken = (P.loadToken || 0) + 1;
-  if (P.v.isNative) setEngine('web');
+  if (P.v.isNative && !keepMusic) setEngine('web');
+  document.documentElement.classList.remove('native-engine');   // the library covers the native video while in the mini bar
   setLock(false);
   document.documentElement.style.background = '';
   exitFullscreen();
@@ -1159,27 +1171,58 @@ function setAudioView(item) {
   art.innerHTML = item.thumb ? `<img src="${item.thumb}" alt="">` : '<svg><use href="#i-note"/></svg>';
   $('#avBg').style.backgroundImage = item.thumb ? `url("${item.thumb}")` : 'none';
 }
-function showMini() { $('#mini').hidden = false; document.body.classList.add('has-mini'); updateMini(); }
-function hideMini() { $('#mini').hidden = true; document.body.classList.remove('has-mini'); }
+function showMini() { $('#mini').hidden = false; document.body.classList.add('has-mini'); updateMini(); miniLoop(); }
+function hideMini() { $('#mini').hidden = true; document.body.classList.remove('has-mini'); cancelAnimationFrame(P.miniRaf); P.miniRaf = 0; }
+/* the mini bar shows the video itself (standard engine), drawn a few times a second */
+function miniLoop() {
+  cancelAnimationFrame(P.miniRaf);
+  let last = 0;
+  const step = ts => {
+    if ($('#mini').hidden) { P.miniRaf = 0; return; }
+    if (ts - last > 80) {
+      last = ts;
+      const c = $('#miniCanvas');
+      if (c && !P.v.isNative && P.v.videoWidth) { try { c.getContext('2d').drawImage(P.v, 0, 0, c.width, c.height); } catch {} }
+    }
+    P.miniRaf = requestAnimationFrame(step);
+  };
+  P.miniRaf = requestAnimationFrame(step);
+}
 function updateMini() {
   if ($('#mini').hidden || !P.item) return;
   const it = P.item;
   $('#miniTitle').textContent = it.title || it.name;
-  $('#miniSub').textContent = it.artist || it.folder || '';
-  const art = $('#miniArt'); art.classList.toggle('ph', !it.thumb);
-  art.innerHTML = it.thumb ? `<img src="${it.thumb}" alt="">` : '<svg><use href="#i-note"/></svg>';
+  $('#miniSub').textContent = it.kind === 'audio' ? (it.artist || it.album || '') : (P.v.isNative ? 'Playing in the background' : (it.folder || ''));
+  const art = $('#miniArt');
+  const live = it.kind !== 'audio' && !P.v.isNative;
+  const mode = (it.kind === 'audio' ? 'a' : live ? 'v' : 'n') + (it.thumb ? 't' : '') + it.id;
+  if (art.dataset.mode !== mode) {
+    art.dataset.mode = mode;
+    art.classList.toggle('vid', it.kind !== 'audio');
+    art.classList.toggle('ph', !it.thumb && !live);
+    art.innerHTML = live ? `<canvas id="miniCanvas" width="160" height="90"></canvas>`
+      : it.thumb ? `<img src="${it.thumb}" alt="">` : `<svg><use href="#i-${it.kind === 'audio' ? 'note' : 'film'}"/></svg>`;
+  }
   $('#miniPlay use').setAttribute('href', P.v.paused ? '#i-play' : '#i-pause');
   $('#miniProg').style.width = P.v.duration ? (P.v.currentTime / P.v.duration * 100) + '%' : '0';
 }
 $('#miniOpen').onclick = () => {
   hideMini();
-  P.el.hidden = false; document.documentElement.style.background = '#000';
+  P.el.hidden = false;
+  document.documentElement.classList.toggle('native-engine', !!P.v.isNative);
+  document.documentElement.style.background = P.v.isNative ? 'transparent' : '#000';
+  if (P.item?.kind !== 'audio' && wantAutoFull()) enterFullscreen();
   if (!history.state?.player) history.pushState({ player: 1 }, '');
   showControls();
 };
 $('#miniPlay').onclick = () => { togglePlay(); setTimeout(updateMini, 50); };
 $('#miniNext').onclick = () => { next(); setTimeout(updateMini, 300); };
-$('#miniClose').onclick = () => { P.v.pause(); clearSleep(); hideMini(); render(); };
+$('#miniClose').onclick = () => {
+  saveProgress(true); P.v.pause(); clearSleep(); deskDetach();
+  if (P.v.isNative) setEngine('web');
+  P.loadToken = (P.loadToken || 0) + 1;
+  hideMini(); render();
+};
 /* Android Back button (MainActivity asks this): one step back inside the app, never straight out. */
 window.OPBack = () => {
   try {
@@ -3052,7 +3095,7 @@ function setEngine(kind) {
   } else if (!native && P.v.isNative) {
     P.nv.close(); P.v = P.webV;
   }
-  document.documentElement.classList.toggle('native-engine', native);
+  if (!P.el.hidden) document.documentElement.classList.toggle('native-engine', native);   // in the mini bar the library stays visible
   P.el.classList.toggle('native-engine', native);
   if (!P.el.hidden) document.documentElement.style.background = native ? 'transparent' : '#000';
 }

@@ -76,7 +76,11 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleFullRelease --no-daemon --stacktrace
+          # 32-bit phones (old/budget): a separate, smaller APK
+          ./gradlew assembleFullRelease -Pabis=armeabi-v7a --no-daemon --stacktrace
+          mkdir -p "$RUNNER_TEMP/apk32" && cp app/build/outputs/apk/full/release/app-full-release.apk "$RUNNER_TEMP/apk32/"
+          # 64-bit phones (nearly all): the main download
+          ./gradlew assembleFullRelease -Pabis=arm64-v8a --no-daemon --stacktrace
 
       - name: Build the Google Play bundle (only with the private key)
         if: env.HAS_SIGNING_KEY == 'true'
@@ -95,6 +99,7 @@ jobs:
         run: |
           mkdir -p dist
           cp android/app/build/outputs/apk/full/release/app-full-release.apk "dist/OpenPlayer-$V.apk"
+          cp "$RUNNER_TEMP/apk32/app-full-release.apk" "dist/OpenPlayer-$V-32bit.apk"
           rm -f "$RUNNER_TEMP/signing.jks"
           AAB=android/app/build/outputs/bundle/playRelease/app-play-release.aab
           if [ -f "$AAB" ]; then cp "$AAB" "dist/OpenPlayer-$V-play.aab"; fi
@@ -235,7 +240,8 @@ jobs:
           After installing, **Settings → About → Verify app** shows the signing fingerprint. It must match the one above.
 
           ### Files
-          - \`OpenPlayer-$V.apk\`: install this on your phone.
+          - \`OpenPlayer-$V.apk\`: install this on your phone (64-bit; nearly all phones).
+          - \`OpenPlayer-$V-32bit.apk\`: only for very old phones where the main one won't install.
           - \`SHA256SUMS.txt\`, \`release.json\`: checksums and release details.
           $AAB_NOTE
           EOF
@@ -251,7 +257,10 @@ jobs:
             dist/release.json
 
       - name: Stable download name (the website's /download/android link points here)
-        run: mkdir -p dist/stable && cp "dist/OpenPlayer-${{ steps.ver.outputs.version }}.apk" dist/stable/OpenPlayer.apk
+        run: |
+          mkdir -p dist/stable
+          cp "dist/OpenPlayer-${{ steps.ver.outputs.version }}.apk" dist/stable/OpenPlayer.apk
+          cp "dist/OpenPlayer-${{ steps.ver.outputs.version }}-32bit.apk" dist/stable/OpenPlayer-32bit.apk
 
       - name: Publish to Releases
         uses: softprops/action-gh-release@v3
@@ -263,6 +272,7 @@ jobs:
           files: |
             dist/OpenPlayer-*
             dist/stable/OpenPlayer.apk
+            dist/stable/OpenPlayer-32bit.apk
             dist/SHA256SUMS.txt
             dist/release.json
 

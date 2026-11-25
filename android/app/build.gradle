@@ -20,12 +20,16 @@ android {
     // Two versions of the app:
     //   full - the APK on GitHub / the website. Includes "All files access" to find videos in hidden folders.
     //   play - for Google Play, whose policy doesn't allow "All files access" for video players.
+    // Store the FFmpeg libraries compressed: a much smaller download (Android unpacks them on install).
+    packagingOptions { jniLibs { useLegacyPackaging = true } }
+
     flavorDimensions "store"
     productFlavors {
         full {
             dimension "store"
-            // The direct APK ships the FFmpeg decoders for phones only (keeps the download smaller).
-            ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+            // The direct APK ships the FFmpeg decoders for one CPU type per APK to keep the download small:
+            // the website builds a 64-bit APK (nearly all phones) and a separate 32-bit one (-Pabis=armeabi-v7a).
+            ndk { abiFilters(*((project.findProperty('abis') ?: 'arm64-v8a,armeabi-v7a').toString().split(','))) }
         }
         play { dimension "store" }   // Play delivers the right decoders per phone from the .aab
     }
