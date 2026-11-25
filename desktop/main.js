@@ -210,6 +210,9 @@ function createWindow() {
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(HOST)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); } });
 }
 
+// Windows: group the taskbar button with the Start menu shortcut so it shows the app's icon.
+if (process.platform === 'win32') app.setAppUserModelId('io.github.adhilbit.openplayer');
+
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', (_e, argv) => {

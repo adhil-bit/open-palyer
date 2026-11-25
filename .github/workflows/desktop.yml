@@ -39,6 +39,14 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # no paid code-signing certificates
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist
+      - name: Check the Linux menu entry matches the app (else the dock shows a gear icon)
+        if: runner.os == 'Linux'
+        run: |
+          want=$(node -p "require('./package.json').desktopName")
+          dpkg-deb -c dist/*.deb | grep -E 'usr/share/(applications|icons)/' | tee /tmp/deb.txt
+          grep -q "usr/share/applications/$want" /tmp/deb.txt || { echo "::error::.deb has no $want"; exit 1; }
+          dpkg-deb --fsys-tarfile dist/*.deb | tar -xO "./usr/share/applications/$want" | tee /tmp/entry.txt
+          grep -q '^Icon=' /tmp/entry.txt
       - name: Collect
         run: |
           mkdir -p out
