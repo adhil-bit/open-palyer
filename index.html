@@ -69,21 +69,65 @@
     .brand { display: flex; align-items: center; gap: 9px; font: 800 19px var(--display); font-stretch: 110%; text-decoration: none; }
     .brand img { width: 26px; height: 26px; }
     .navlinks { display: flex; gap: 22px; margin-left: auto; font-size: 15.5px; }
-    .navlinks a { text-decoration: none; color: var(--soft); }
+    .navlinks a { text-decoration: none; color: var(--soft); white-space: nowrap; }
     .navlinks a:hover { color: var(--ink); }
     .navcta { font-weight: 700; font-size: 15.5px; text-decoration: none; padding: 8px 16px; border-radius: 8px; background: var(--ink); color: var(--page); }
-    @media (max-width: 860px) { .navlinks { display: none; } .navcta { margin-left: auto; } }
+    @media (max-width: 960px) { .navlinks { display: none; } .navcta { margin-left: auto; } }
 
     /* hero: a black screen with the headline as a two-line subtitle */
     .hero { padding: 28px 0 0; }
+    /* top: copy + download on the left, real screenshots on the right */
+    .top { padding: 44px 0 8px; overflow: hidden; }
+    .top-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
+    .kicker { display: inline-block; font-weight: 800; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--sub); background: color-mix(in srgb, var(--sub) 12%, transparent); border: 1px solid color-mix(in srgb, var(--sub) 35%, transparent); padding: 6px 12px; border-radius: 999px; }
+    .top h1 { margin: 18px 0 0; font: 800 clamp(36px, 4.6vw, 58px)/1.04 var(--display); font-stretch: 110%; letter-spacing: -.01em; }
+    .top h1 .red { color: var(--sub); }
+    @media (min-width: 400px) { .top h1 .nw { white-space: nowrap; } }
+    .top .lead { font-size: 19px; color: var(--soft); max-width: 46ch; margin: 18px 0 26px; }
+    .dl-meta { margin-top: 12px; font-size: 14px; color: var(--soft); }
+    .trust-row { list-style: none; padding: 0; margin: 20px 0 0; display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14.5px; font-weight: 600; }
+    .trust-row li { display: inline-flex; align-items: center; gap: 6px; }
+    .trust-row svg { width: 17px; height: 17px; color: var(--yes); }
+    .trust-row a { color: inherit; }
+    .shots { position: relative; margin: 0; padding: 0 0 34px 0; }
+    .shot-wide { margin-left: 70px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 60px -20px rgba(0,0,0,.45); background: #000; }
+    .shot-wide img { display: block; width: 100%; height: auto; }
+    .shot-phone { position: absolute; left: 0; bottom: 30px; width: 34%; border-radius: 28px; padding: 7px; background: #0b0c0e; box-shadow: 0 24px 50px -12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08) inset; }
+    .shot-phone img { display: block; width: 100%; height: auto; border-radius: 22px; }
+    .shots figcaption { position: absolute; right: 0; bottom: 0; font-size: 12.5px; color: var(--soft); text-align: right; max-width: 62%; }
+    .shots figcaption a { color: inherit; }
+    @media (max-width: 920px) {
+      .top-grid { grid-template-columns: 1fr; gap: 36px; }
+      .shots { max-width: 620px; }
+    }
+    @media (max-width: 520px) { .shot-wide { margin-left: 46px; } .shot-phone { width: 38%; border-radius: 20px; padding: 5px; } .shot-phone img { border-radius: 16px; } .shots figcaption { position: static; margin-top: 10px; } .shots { padding-bottom: 0; } }
+    /* why trust */
+    .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 28px; }
+    .tcard { display: block; text-decoration: none; color: inherit; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+    a.tcard:hover { border-color: var(--ink); }
+    .tcard svg { width: 26px; height: 26px; color: var(--sub); }
+    .tcard b { display: block; font-size: 18px; margin-top: 10px; }
+    .tcard span { display: block; color: var(--soft); font-size: 15px; margin-top: 6px; }
+    .tcard em { display: block; font-style: normal; font-weight: 700; font-size: 14.5px; margin-top: 10px; color: var(--sub); }
+    @media (max-width: 900px) { .trust-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .trust-grid { grid-template-columns: 1fr; } }
+    .demo { padding-top: 72px; }
+    /* open source: the mix */
+    .oss-mix { margin-top: 30px; }
+    .oss-mix h3 { font-size: 21px; }
+    .oss-mix ul { list-style: none; padding: 0; margin: 14px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 26px; }
+    .oss-mix li b { display: block; font-size: 16px; }
+    .oss-mix li span { display: block; color: var(--soft); font-size: 15px; margin-top: 2px; }
+    .oss-built { margin-top: 16px; font-size: 14px; color: var(--soft); }
+    @media (max-width: 640px) { .oss-mix ul { grid-template-columns: 1fr; } }
     .screen { position: relative; background: var(--screen); border-radius: 10px; aspect-ratio: 21 / 9; overflow: hidden;
       display: flex; align-items: flex-end; justify-content: center; padding: 0 5% 9%; }
     .screen::before { content: ''; position: absolute; inset: 0; pointer-events: none;
       background: radial-gradient(ellipse 80% 70% at 50% 35%, #1d1f24 0%, #000 72%); }
-    .screen h1 { position: relative; text-align: center; font: 700 clamp(26px, 4.1vw, 54px)/1.2 var(--text); letter-spacing: 0;
+    .screen .h1like { position: relative; text-align: center; font: 700 clamp(26px, 4.1vw, 54px)/1.2 var(--text); letter-spacing: 0;
       color: #fff; text-shadow: 0 2px 0 #000, 0 0 3px #000, 0 0 14px rgba(0,0,0,.7); }
-    @media (min-width: 641px) { .screen h1 span { white-space: nowrap; } }
-    .screen h1 span { display: block; }
+    @media (min-width: 641px) { .screen .h1like span { white-space: nowrap; } }
+    .screen .h1like span { display: block; }
     .badge-hd { position: absolute; top: 18px; right: 20px; font: 600 13px var(--text); color: #9ba1aa; border: 1px solid #3a3d44; border-radius: 4px; padding: 1px 7px; }
     .player-bar { display: flex; align-items: center; gap: 14px; padding: 12px 4px 0; color: var(--soft); font-size: 14.5px; font-variant-numeric: tabular-nums; }
     .player-bar svg { width: 22px; height: 22px; color: var(--ink); }
@@ -101,11 +145,11 @@
     .cue { position: absolute; left: 5%; right: 5%; bottom: 9%; text-align: center; margin: 0; font: 700 clamp(20px, 2.8vw, 36px)/1.25 var(--text);
       color: #fff; text-shadow: 0 2px 0 #000, 0 0 6px #000; opacity: 0; transition: opacity .25s; }
     .cue.on { opacity: 1; }
-    .screen h1 { transition: opacity .5s, transform .5s; }
-    .run .screen h1 { opacity: 0; transform: translateY(8px); }
-    .run.done .screen h1 { opacity: 1; transform: none; }
-    .screen h1 span:last-child { transition: opacity .4s .35s; }
-    .run:not(.done) .screen h1 span:last-child { opacity: 0; }
+    .screen .h1like { transition: opacity .5s, transform .5s; }
+    .run .screen .h1like { opacity: 0; transform: translateY(8px); }
+    .run.done .screen .h1like { opacity: 1; transform: none; }
+    .screen .h1like span:last-child { transition: opacity .4s .35s; }
+    .run:not(.done) .screen .h1like span:last-child { opacity: 0; }
     .adcard { position: absolute; left: 22px; top: 18px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px;
       background: rgba(255,255,255,.12); color: #e6e8eb; font-size: 14px; opacity: 0; transform: translateY(10px); transition: opacity .25s, transform .25s; }
     .adcard b { background: var(--admark); color: #111; border-radius: 3px; padding: 0 6px; font-size: 12.5px; }
@@ -354,18 +398,73 @@
   <nav>
     <div class="wrap">
       <a class="brand" href="#top"><img src="app/icons/icon.svg" alt="">Open Player<span class="adfree">ad-free</span></a>
-      <div class="navlinks"><a href="#opensource">Open source</a><a href="#compare">Compare</a><a href="#features">Features</a><a href="#desktop">Desktop</a><a href="#use">How to use</a><a href="#privacy">Privacy</a><a href="#verify">Verify</a><a href="#faq">FAQ</a></div>
+      <div class="navlinks"><a href="#trust">Why trust it</a><a href="#opensource">Open source</a><a href="#features">Features</a><a href="#compare">Compare</a><a href="#desktop">Desktop</a><a href="#faq">FAQ</a></div>
       <a class="navcta" href="#download">Download</a>
     </div>
   </nav>
 
-  <header class="hero" id="top">
+  <header class="top" id="top">
+    <div class="wrap top-grid">
+      <div class="top-copy">
+        <span class="kicker">Your media. Your control.</span>
+        <h1><span class="nw">Watch your videos.</span><br><span class="red">Not ads.</span></h1>
+        <p class="lead">Open Player is a free, open-source video and music player. The gestures, subtitles and equalizer you know from MX Player and VLC, with no ads, no account and no tracking.</p>
+        <div id="download">
+          <div class="ctas">
+            <a class="btn main" id="mainDl" data-apk href="/download/android"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>
+            <a class="btn plain" href="app/"><svg><use href="#globe"/></svg><span>Open in your browser<small>No install needed</small></span></a>
+          </div>
+          <div class="plats" id="plats">
+            <span class="plats-label">Also for</span>
+            <a data-p="android" data-apk href="/download/android"><svg><use href="#android"/></svg>Android</a>
+            <a data-p="win" href="/download/windows"><svg><use href="#pc"/></svg>Windows</a>
+            <a data-p="mac" href="/download/mac"><svg><use href="#pc"/></svg>Mac</a>
+            <a data-p="linux" href="/download/ubuntu"><svg><use href="#pc"/></svg>Ubuntu</a>
+            <a data-p="ios" href="#iphone"><svg><use href="#phone"/></svg>iPhone &amp; iPad</a>
+          </div>
+          <p class="runs" id="iphone">On iPhone or iPad, <a href="app/">open the web app</a> in Safari, then tap Share › <b>Add to Home Screen</b>. It installs like an app. Apple only allows App Store apps, so there’s no download. Other Linux: <a href="#desktop">AppImage</a>.</p>
+          <p class="dl-meta" id="dlMeta">Free · No sign-up · Android 7.0 or newer</p>
+          <a class="verified-line" href="#verify" id="verifiedLine" hidden><svg><use href="#shield"/></svg><span id="verifiedText"></span></a>
+        </div>
+        <ul class="trust-row" aria-label="Why it’s safe">
+          <li><svg><use href="#ok"/></svg>No ads, ever</li>
+          <li><svg><use href="#ok"/></svg>No account</li>
+          <li><svg><use href="#ok"/></svg><a href="/github">Open source</a></li>
+          <li><svg><use href="#ok"/></svg><a href="#verify">Virus-scanned</a></li>
+        </ul>
+      </div>
+      <figure class="shots" aria-label="Screenshots of Open Player">
+        <div class="shot-wide"><img src="img/shot-player.webp" width="1280" height="720" alt="Open Player playing a video, with the seek bar, skip and subtitle buttons"></div>
+        <div class="shot-phone"><img src="img/shot-library.webp" width="780" height="1688" alt="Open Player’s video library on a phone"></div>
+        <figcaption>Real screenshots of the app. Video: <a href="https://peach.blender.org" rel="noopener">Big Buck Bunny</a> © Blender Foundation, CC BY 3.0.</figcaption>
+      </figure>
+    </div>
+  </header>
+
+  <!-- WHY TRUST -->
+  <section id="trust">
+    <div class="wrap">
+      <h2>Why trust Open Player?</h2>
+      <p class="intro">You shouldn’t have to take an app’s word for it. Here’s what you can check yourself.</p>
+      <div class="trust-grid">
+        <a class="tcard" href="/github"><svg><use href="#code"/></svg><b>Open source</b><span>Every line of code is public on GitHub under the GPL-3.0 licence. Anyone can read it.</span><em>See the code ›</em></a>
+        <div class="tcard"><svg><use href="#no"/></svg><b>No ads, no trackers</b><span>No ad networks, no analytics and no sign-in. Your videos never leave your device.</span></div>
+        <div class="tcard"><svg><use href="#shield"/></svg><b>Clear permissions</b><span>It reads your videos and music to list them. Internet is only for streams and links you open. “All files access” is optional, for hidden folders.</span></div>
+        <a class="tcard" href="/releases"><svg><use href="#ok"/></svg><b>Built in public</b><span>Every APK is built automatically by GitHub from the public code. Nothing is built by hand.</span><em>See all releases ›</em></a>
+        <a class="tcard" href="#verify"><svg><use href="#shield"/></svg><b>Virus-scanned</b><span id="trustVt">Each release is scanned by dozens of antivirus engines on VirusTotal, and the report is public.</span><em>See the result ›</em></a>
+        <a class="tcard" href="#verify"><svg><use href="#ok"/></svg><b>Check your download</b><span>Compare the file’s SHA-256 checksum and signing fingerprint with the ones published here.</span><em>How to check ›</em></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEMO: what "ad-free" looks like -->
+  <section class="hero demo" id="demo" aria-label="What ad-free looks like">
     <div class="wrap">
       <div class="screen" id="screen">
         <span class="badge-hd" aria-hidden="true">CC</span>
         <div class="adcard" id="adcard" aria-hidden="true"><b>Ad</b><span>Your video resumes in 5</span><s>Removed</s></div>
         <p class="cue" id="cue" aria-hidden="true"></p>
-        <h1 id="caption"><span>The player that plays your videos.</span><span>Not ads.</span></h1>
+        <p class="h1like" id="caption"><span>The player that plays your videos.</span><span>Not ads.</span></p>
       </div>
       <div class="player-bar">
         <button class="replay" id="replay" aria-label="Play the intro again"><svg><use href="#play"/></svg></button>
@@ -374,27 +473,8 @@
         <span class="adbreaks" aria-hidden="true">Ad breaks: <b id="adn">none</b></span>
       </div>
 
-      <div class="hero-body">
-        <p class="lead">A free, open-source video and music player with the gestures, subtitles and equalizer you’re used to. No ads, no account, no tracking. Install it on Android, Windows, Mac or Ubuntu, or open it in any browser.</p>
-        <div id="download">
-          <div class="ctas">
-            <a class="btn main" id="mainDl" data-apk href="https://github.com/adhil-bit/open-palyer/releases/latest" rel="noopener"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>
-            <a class="btn plain" href="app/"><svg><use href="#globe"/></svg><span>Open in your browser<small>No install needed</small></span></a>
-          </div>
-          <div class="plats" id="plats">
-            <span class="plats-label">Also for</span>
-            <a data-p="android" data-apk href="https://github.com/adhil-bit/open-palyer/releases/latest" rel="noopener"><svg><use href="#android"/></svg>Android</a>
-            <a data-p="win" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-win-x64.exe"><svg><use href="#pc"/></svg>Windows</a>
-            <a data-p="mac" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-mac-arm64.dmg"><svg><use href="#pc"/></svg>Mac</a>
-            <a data-p="linux" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-linux-amd64.deb"><svg><use href="#pc"/></svg>Ubuntu</a>
-            <a data-p="ios" href="#iphone"><svg><use href="#phone"/></svg>iPhone &amp; iPad</a>
-          </div>
-          <p class="runs" id="iphone">On iPhone or iPad, <a href="app/">open the web app</a> in Safari, then tap Share › <b>Add to Home Screen</b>. It installs like an app. Apple only allows App Store apps, so there’s no download. Other Linux: <a href="#desktop">AppImage</a>.</p>
-          <a class="verified-line" href="#verify" id="verifiedLine" hidden><svg><use href="#shield"/></svg><span id="verifiedText"></span></a>
-        </div>
-      </div>
     </div>
-  </header>
+  </section>
 
   <!-- OPEN SOURCE -->
   <section id="opensource">
@@ -411,8 +491,18 @@
           <li><b>Change it</b><span>Fork it, add features, rebrand it for your own app.</span></li>
           <li><b>Share it</b><span>Pass on your version too. Keep it open source under the same GPL-3.0 licence and credit the original.</span></li>
         </ul>
+        <div class="oss-mix">
+          <h3>The best of MX Player, VLC and Next Player, in one open app</h3>
+          <ul>
+            <li><b>Like MX Player</b><span>Swipe gestures for brightness, volume and seeking, double-tap to skip, a PIN-locked private folder and a kids mode.</span></li>
+            <li><b>Like VLC</b><span>Plays almost any file: MKV, AVI, HEVC, AC3, DTS and built-in subtitles, using FFmpeg.</span></li>
+            <li><b>Like Next Player</b><span>Google’s modern Media3 player engine on Android, with audio-language and subtitle-track choice.</span></li>
+            <li><b>Only in Open Player</b><span>The same player on Android, Windows, Mac, Ubuntu and the web, and downloads you can verify.</span></li>
+          </ul>
+          <p class="oss-built">Built on open source: <a href="https://ffmpeg.org" rel="noopener">FFmpeg</a>, <a href="https://developer.android.com/media/media3" rel="noopener">Android Media3</a>, <a href="https://capacitorjs.com" rel="noopener">Capacitor</a> and <a href="https://www.electronjs.org" rel="noopener">Electron</a>. Open Player isn’t affiliated with MX Player, VLC or Next Player.</p>
+        </div>
         <div class="oss-ctas">
-          <a class="btn main" href="https://github.com/adhil-bit/open-palyer" rel="noopener"><svg><use href="#code"/></svg><span>View the source code<small>github.com/adhil-bit/open-palyer</small></span></a>
+          <a class="btn main" href="/github" rel="noopener"><svg><use href="#code"/></svg><span>View the source code<small>github.com/adhil-bit/open-palyer</small></span></a>
           <a class="btn plain" href="https://github.com/adhil-bit/open-palyer/fork" rel="noopener"><span>Fork it on GitHub<small>Start your own version</small></span></a>
           <a class="oss-lic" href="https://github.com/adhil-bit/open-palyer/blob/main/LICENSE" rel="noopener">Read the licence</a>
         </div>
@@ -540,10 +630,10 @@
       <h2>Open Player on your computer</h2>
       <p class="intro">Browsers can’t decode HEVC (x265) video or AC3, DTS and TrueHD sound, which most MKV downloads use. The desktop app has FFmpeg built in, so those files play, with audio-language choice and the subtitles inside the file.</p>
       <div class="dl" id="dlList">
-        <a data-os="linux" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-linux-x86_64.AppImage"><b>Linux</b><span>AppImage, runs on any distro</span></a>
-        <a data-os="linux" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-linux-amd64.deb"><b>Ubuntu and Debian</b><span>.deb package</span></a>
-        <a data-os="win" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-win-x64.exe"><b>Windows</b><span>Installer, 64-bit</span></a>
-        <a data-os="mac" href="https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-mac-arm64.dmg"><b>Mac</b><span>Apple silicon (M1 and newer)</span></a>
+        <a data-os="linux" href="/download/linux"><b>Linux</b><span>AppImage, runs on any distro</span></a>
+        <a data-os="linux" href="/download/ubuntu"><b>Ubuntu and Debian</b><span>.deb package</span></a>
+        <a data-os="win" href="/download/windows"><b>Windows</b><span>Installer, 64-bit</span></a>
+        <a data-os="mac" href="/download/mac"><b>Mac</b><span>Apple silicon (M1 and newer)</span></a>
       </div>
       <p class="fine">Ubuntu: <code>sudo apt install ./OpenPlayer-linux-amd64.deb</code>, or make the AppImage executable and double-click it. The Windows and Mac builds aren’t signed with a paid certificate, so the first launch shows a warning: choose “More info › Run anyway” on Windows, or right-click › Open on a Mac. Checksums are on the <a href="https://github.com/adhil-bit/open-palyer/releases/tag/desktop">desktop release page</a>.</p>
     </div>
@@ -673,7 +763,7 @@
       </svg>
       <p class="cap">Watch without the ads.</p>
       <div class="ctas">
-        <a class="btn main" data-apk href="https://github.com/adhil-bit/open-palyer/releases/latest" rel="noopener"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>
+        <a class="btn main" data-apk href="/download/android"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>
         <a class="btn plain" href="app/"><svg><use href="#globe"/></svg><span>Open in your browser<small>No install needed</small></span></a>
       </div>
     </div>
@@ -699,8 +789,12 @@
       try { const res = await fetch('release.json', { cache: 'no-cache' }); if (!res.ok) throw 0; r = await res.json(); }
       catch { $('vMissing').hidden = false; $('vgrid').style.opacity = .5; return; }
       const mb = r.size ? (r.size / 1048576).toFixed(1) + ' MB' : '';
-      document.querySelectorAll('[data-apk]').forEach(a => { a.href = r.download; a.setAttribute('download', r.apk); });
+      document.querySelectorAll('[data-apk]').forEach(a => { a.href = r.download; });
       document.querySelectorAll('[data-apk-meta]').forEach(m => { m.textContent = `Free APK, version ${r.version}${mb ? ', ' + mb : ''}`; });
+      if (r.date) $('dlMeta').textContent = `Free · Version ${r.version}${mb ? ' · ' + mb : ''} · Updated ${new Date(r.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} · Android 7.0+`;
+      { const vt = r.virustotal || {}; if (vt.status === 'done' && vt.engines) $('trustVt').textContent = vt.flagged === 0
+          ? `The latest version was checked by ${vt.engines} antivirus engines on VirusTotal: none found anything.`
+          : `The latest version was checked by ${vt.engines} antivirus engines on VirusTotal. See the full report.`; }
       $('vVersion').textContent = r.version;
       $('vDate').textContent = r.date ? 'Built ' + new Date(r.date).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) + (mb ? ', ' + mb : '') : '';
       $('vSha').textContent = r.sha256;
@@ -727,11 +821,11 @@
       const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
       const os = ios ? 'ios' : /Android/.test(ua) ? 'android' : /Windows/.test(ua) ? 'win' : /Mac OS X/.test(ua) ? 'mac' : /Linux|CrOS/.test(ua) ? 'linux' : '';
       if (os) document.querySelectorAll(`#dlList [data-os="${os}"]`).forEach(a => a.classList.add('mine'));
-      const R = 'https://github.com/adhil-bit/open-palyer/releases/download/desktop/';
+      const R = '/download/';
       const main = {
-        win: [R + 'OpenPlayer-win-x64.exe', 'pc', 'Download for Windows', 'Installer, 64-bit · plays every format'],
-        mac: [R + 'OpenPlayer-mac-arm64.dmg', 'pc', 'Download for Mac', 'Apple silicon · plays every format'],
-        linux: [R + 'OpenPlayer-linux-amd64.deb', 'pc', 'Download for Ubuntu', '.deb package · plays every format'],
+        win: [R + 'windows', 'pc', 'Download for Windows', 'Installer, 64-bit · plays every format'],
+        mac: [R + 'mac', 'pc', 'Download for Mac', 'Apple silicon · plays every format'],
+        linux: [R + 'ubuntu', 'pc', 'Download for Ubuntu', '.deb package · plays every format'],
         ios: ['app/', 'phone', 'Get it on iPhone', 'Opens in Safari · Add to Home Screen'],
       }[os];
       if (!main) { document.querySelector('#plats [data-p="android"]').hidden = true; return; }   // Android or unknown: keep the APK button

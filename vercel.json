@@ -1,0 +1,15 @@
+{
+  "redirects": [
+    { "source": "/download/android", "destination": "https://github.com/adhil-bit/open-palyer/releases/latest/download/OpenPlayer.apk", "permanent": false },
+    { "source": "/download/windows", "destination": "https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-win-x64.exe", "permanent": false },
+    { "source": "/download/mac", "destination": "https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-mac-arm64.dmg", "permanent": false },
+    { "source": "/download/ubuntu", "destination": "https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-linux-amd64.deb", "permanent": false },
+    { "source": "/download/linux", "destination": "https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-linux-x86_64.AppImage", "permanent": false },
+    { "source": "/github", "destination": "https://github.com/adhil-bit/open-palyer", "permanent": false },
+    { "source": "/source", "destination": "https://github.com/adhil-bit/open-palyer", "permanent": false },
+    { "source": "/releases", "destination": "https://github.com/adhil-bit/open-palyer/releases", "permanent": false }
+  ],
+  "headers": [
+    { "source": "/release.json", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+  ]
+}

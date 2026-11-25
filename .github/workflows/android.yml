@@ -250,6 +250,9 @@ jobs:
             dist/SHA256SUMS.txt
             dist/release.json
 
+      - name: Stable download name (the website's /download/android link points here)
+        run: mkdir -p dist/stable && cp "dist/OpenPlayer-${{ steps.ver.outputs.version }}.apk" dist/stable/OpenPlayer.apk
+
       - name: Publish to Releases
         uses: softprops/action-gh-release@v3
         with:
@@ -259,8 +262,31 @@ jobs:
           body_path: ${{ runner.temp }}/notes.md
           files: |
             dist/OpenPlayer-*
+            dist/stable/OpenPlayer.apk
             dist/SHA256SUMS.txt
             dist/release.json
+
+      # The Vercel website reads release.json from the repo: save this release's details there.
+      # "[skip ci]" stops this commit from starting another build.
+      - name: Save release details for the website
+        env:
+          V: ${{ steps.ver.outputs.version }}
+        run: |
+          jq '.download = "/download/android"' dist/release.json > "$RUNNER_TEMP/release.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3; do
+            rm -rf "$RUNNER_TEMP/site-info"; git worktree prune
+            git fetch -q --depth=1 origin main
+            git worktree add -q --detach "$RUNNER_TEMP/site-info" FETCH_HEAD
+            cp "$RUNNER_TEMP/release.json" "$RUNNER_TEMP/site-info/release.json"
+            cd "$RUNNER_TEMP/site-info"
+            git add release.json
+            if git diff --cached --quiet; then cd "$GITHUB_WORKSPACE"; break; fi
+            git commit -q -m "Website: release details for $V [skip ci]"
+            if git push -q origin HEAD:main; then cd "$GITHUB_WORKSPACE"; break; fi
+            cd "$GITHUB_WORKSPACE"; sleep 5
+          done
 
       # The website, with the APK and its verification details next to it.
       - name: Prepare the website
@@ -269,7 +295,7 @@ jobs:
         run: |
           mkdir -p site/download
           cp -r index.html sw.js app .nojekyll site/
-          cp dist/release.json site/
+          cp dist/release.json site/   # keeps download: "download/OpenPlayer.apk" for this copy
           cp "dist/OpenPlayer-$V.apk" site/download/OpenPlayer.apk
           cp dist/SHA256SUMS.txt site/download/
 
