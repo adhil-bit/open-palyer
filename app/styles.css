@@ -576,3 +576,6 @@ body:has(#player:not([hidden]))::after { display: none; }
 .diag div { display: grid; grid-template-columns: 120px 1fr; gap: 10px; }
 .diag b { color: var(--muted); font-weight: 600; }
 .diag span { word-break: break-word; }
+
+/* floating window: just the video */
+body.in-pip .controls, body.in-pip .ptoast, body.in-pip #snackbar, body.in-pip .gesture-hint { display: none !important; }

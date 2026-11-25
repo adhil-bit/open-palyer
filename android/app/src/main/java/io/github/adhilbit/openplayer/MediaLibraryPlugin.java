@@ -918,6 +918,22 @@ public class MediaLibraryPlugin extends Plugin {
         });
     }
 
+    /** The page says whether a video is playing full screen, so Home can open the floating window. */
+    @PluginMethod
+    public void setAutoPip(PluginCall call) {
+        boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
+        Object w = call.getData().opt("width"), h = call.getData().opt("height");
+        MainActivity.autoPip = on;
+        if (w instanceof Number && ((Number) w).intValue() > 0) MainActivity.pipW = ((Number) w).intValue();
+        if (h instanceof Number && ((Number) h).intValue() > 0) MainActivity.pipH = ((Number) h).intValue();
+        Activity a = getActivity();
+        if (a == null || Build.VERSION.SDK_INT < 26) { call.resolve(); return; }
+        a.runOnUiThread(() -> {
+            try { a.setPictureInPictureParams(MainActivity.pipParams(on)); } catch (Exception ignored) {}
+            call.resolve();
+        });
+    }
+
     /** Heights of the status bar and navigation buttons, in CSS pixels. */
     @PluginMethod
     public void getInsets(PluginCall call) {

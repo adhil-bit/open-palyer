@@ -707,6 +707,7 @@ async function sheetSettings() {
     <div class="group">Playback</div>
     ${opt('resume', 'i-loop', 'Resume where you left off', `<span class="val">${resumeLbl[S.resume]}</span>`)}
     ${opt('autoNext', 'i-next', 'Auto-play next video', sw(S.autoNext))}
+    ${NATIVE ? opt('autoPip', 'i-pip', 'Floating window when you press Home<small>The video keeps playing in a small window over other apps</small>', sw(S.autoPip !== false)) : ''}
     ${opt('bgPlay', 'i-pip', 'Keep playing after leaving the player<small>Back shows a mini player at the bottom, like MX Player</small>', sw(S.bgPlay !== false))}
     ${opt('musicMini', 'i-note', 'Play songs in the mini player<small>Off: songs open the full music screen</small>', sw(S.musicMini !== false))}
     ${opt('autoFull', 'i-aspect', 'Full screen when a video starts<small>Off: plays in the window; use the full-screen button or press F</small>', sw(wantAutoFull()))}
@@ -757,6 +758,7 @@ async function sheetSettings() {
     if (o === 'resume') S.resume = { always: 'ask', ask: 'never', never: 'always' }[S.resume];
     if (o === 'autoNext') S.autoNext = !S.autoNext;
     if (o === 'bgPlay') S.bgPlay = S.bgPlay === false;
+    if (o === 'autoPip') { S.autoPip = S.autoPip === false; P.autoPipKey = null; syncAutoPip(); }
     if (o === 'musicMini') S.musicMini = S.musicMini === false;
     if (o === 'autoFull') S.autoFull = !wantAutoFull();
     if (o === 'keepAwake') S.keepAwake = !S.keepAwake;
@@ -1137,8 +1139,22 @@ function onBuffer() {
   let end = 0; for (let i = 0; i < v.buffered.length; i++) if (v.buffered.start(i) <= v.currentTime + 1) end = v.buffered.end(i);
   $('#seekBuf').style.width = (end / v.duration * 100) + '%';
 }
+/* Home while a video plays → floating window (picture-in-picture), like MX Player. */
+function syncAutoPip() {
+  if (!NATIVE || !ML?.setAutoPip) return;
+  const on = S.autoPip !== false && !P.el.hidden && !!P.item && P.item.kind !== 'audio' && !P.v.paused;
+  const key = on + ':' + (P.v.videoWidth || 16) + 'x' + (P.v.videoHeight || 9);
+  if (key === P.autoPipKey) return;
+  P.autoPipKey = key;
+  ML.setAutoPip({ on, width: P.v.videoWidth || 16, height: P.v.videoHeight || 9 }).catch(() => {});
+}
+window.OPPip = inPip => {
+  document.body.classList.toggle('in-pip', !!inPip);
+  if (inPip) hideControls();
+};
 function onPlayState() {
   const playing = !P.v.paused;
+  syncAutoPip();
   $('#btnPlay use').setAttribute('href', playing ? '#i-pause' : '#i-play');
   $('#btnPlay').setAttribute('aria-label', playing ? 'Pause' : 'Play');
   if (navigator.mediaSession) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
@@ -1194,6 +1210,7 @@ function touchRecent(it) {
 }
 
 function closePlayer(fromPop) {
+  setTimeout(syncAutoPip, 0);
   saveProgress(true);
   const keepMusic = !!P.item && !P.v.paused && (P.item.kind === 'audio' || S.bgPlay !== false);
   if (!keepMusic) { P.v.pause(); clearSleep(); deskDetach(); }
@@ -1261,6 +1278,7 @@ function updateMini() {
 }
 $('#miniOpen').onclick = () => {
   hideMini();
+  setTimeout(syncAutoPip, 0);
   P.el.hidden = false;
   document.documentElement.classList.toggle('native-engine', !!P.v.isNative);
   document.documentElement.style.background = P.v.isNative ? 'transparent' : '#000';
