@@ -866,6 +866,8 @@ function bindVideo(v) {
   v.addEventListener('ratechange', () => ($('#btnSpeed').textContent = fmtRate(v.playbackRate)));
 }
 bindVideo(P.v);
+const BLANK_POSTER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';   // 1×1 transparent
+document.getElementById('video')?.setAttribute('poster', BLANK_POSTER);
 function freshVideo() {
   // A video element routed through Web Audio (for volume boost) can't later play
   // a non-CORS network stream with sound, so swap in a clean element when needed.
@@ -1056,6 +1058,8 @@ function loadWith(item, startAt, engine) {
   else if (item.remote) P.v.src = item.url;
   else if (item.src) P.v.src = item.src;
   else { item.url ||= URL.createObjectURL(item.file); P.v.src = item.url; }
+  // Never show the browser's default grey "play" poster while loading: the thumbnail, or plain black.
+  if (!P.v.isNative) P.v.poster = item.kind !== 'audio' && item.thumb ? item.thumb : BLANK_POSTER;
   setAudioView(item);
   P.v.playbackRate = S.defaultSpeed;
   $('#vTitle').textContent = item.kind === 'audio' ? (item.title || item.name) : item.name;

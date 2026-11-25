@@ -579,3 +579,6 @@ body:has(#player:not([hidden]))::after { display: none; }
 
 /* floating window: just the video */
 body.in-pip .controls, body.in-pip .ptoast, body.in-pip #snackbar, body.in-pip .gesture-hint { display: none !important; }
+
+/* the thumbnail shown while a video loads fits like the video itself */
+#video { object-fit: contain; background: #000; }
