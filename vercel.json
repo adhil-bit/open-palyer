@@ -1,6 +1,8 @@
 {
   "redirects": [
     { "source": "/download/android", "destination": "https://github.com/adhil-bit/open-palyer/releases/latest/download/OpenPlayer.apk", "permanent": false },
+    { "source": "/download/android-beta", "destination": "https://github.com/adhil-bit/open-palyer/releases/download/android-beta/OpenPlayer.apk", "permanent": false },
+    { "source": "/download/android-previous", "destination": "https://github.com/adhil-bit/open-palyer/releases/download/android-previous/OpenPlayer.apk", "permanent": false },
     { "source": "/download/android-32bit", "destination": "https://github.com/adhil-bit/open-palyer/releases/latest/download/OpenPlayer-32bit.apk", "permanent": false },
     { "source": "/download/windows", "destination": "https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-win-x64.exe", "permanent": false },
     { "source": "/download/mac", "destination": "https://github.com/adhil-bit/open-palyer/releases/download/desktop/OpenPlayer-mac-arm64.dmg", "permanent": false },

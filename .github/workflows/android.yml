@@ -2,7 +2,8 @@ name: Android build & release
 
 on:
   push:
-    branches: [main]
+    # main → the normal download.  beta → a test build at /download/android-beta, tried before main.
+    branches: [main, beta]
   workflow_dispatch:
 
 permissions:
@@ -12,7 +13,7 @@ permissions:
   pages: write         # publish the website
 
 concurrency:
-  group: android-apk
+  group: android-apk-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -45,7 +46,9 @@ jobs:
 
       - name: Version
         id: ver
-        run: echo "version=${APP_VER}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "${{ github.ref_name }}" = "beta" ]; then S="-beta"; else S=""; fi
+          echo "version=${APP_VER}.${{ github.run_number }}$S" >> "$GITHUB_OUTPUT"
 
       - name: Install
         run: npm ci
@@ -263,7 +266,49 @@ jobs:
           cp "dist/OpenPlayer-${{ steps.ver.outputs.version }}.apk" dist/stable/OpenPlayer.apk
           cp "dist/OpenPlayer-${{ steps.ver.outputs.version }}-32bit.apk" dist/stable/OpenPlayer-32bit.apk
 
+      # Test builds: one rolling pre-release, never the "latest" one.
+      - name: Publish the test build (beta)
+        if: github.ref_name == 'beta'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: android-beta
+          target_commitish: ${{ github.sha }}
+          name: Open Player test build (beta)
+          prerelease: true
+          make_latest: false
+          body: |
+            Test build ${{ steps.ver.outputs.version }} from commit ${{ github.sha }}. Try it before it becomes the normal download.
+            Download: https://open-play-adfree.vercel.app/download/android-beta
+          files: |
+            dist/stable/OpenPlayer.apk
+            dist/stable/OpenPlayer-32bit.apk
+
+      # Before replacing the normal download, keep the current one as "previous" (one tap to go back).
+      - name: Keep the current version as "previous"
+        if: github.ref_name == 'main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p prev
+          gh release download --repo "${{ github.repository }}" --pattern OpenPlayer.apk --pattern OpenPlayer-32bit.apk -D prev || true
+          ls -l prev
+      - name: Publish the previous version
+        if: github.ref_name == 'main' && hashFiles('prev/OpenPlayer.apk') != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: android-previous
+          name: Open Player previous version
+          prerelease: true
+          make_latest: false
+          body: |
+            The version before the current download, in case an update breaks something.
+            Download: https://open-play-adfree.vercel.app/download/android-previous
+          files: |
+            prev/OpenPlayer.apk
+            prev/OpenPlayer-32bit.apk
+
       - name: Publish to Releases
+        if: github.ref_name == 'main'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.ver.outputs.version }}
@@ -280,6 +325,7 @@ jobs:
       # The Vercel website reads release.json from the repo: save this release's details there.
       # "[skip ci]" stops this commit from starting another build.
       - name: Save release details for the website
+        if: github.ref_name == 'main'
         env:
           V: ${{ steps.ver.outputs.version }}
         run: |
@@ -301,6 +347,7 @@ jobs:
 
       # The website, with the APK and its verification details next to it.
       - name: Prepare the website
+        if: github.ref_name == 'main'
         env:
           V: ${{ steps.ver.outputs.version }}
         run: |
@@ -311,6 +358,7 @@ jobs:
           cp dist/SHA256SUMS.txt site/download/
 
       - uses: actions/upload-pages-artifact@v5
+        if: github.ref_name == 'main'
         with:
           path: site
           include-hidden-files: true
@@ -319,6 +367,7 @@ jobs:
   # Pages for a private repository needs a paid GitHub plan, so this step may fail until then.
   website:
     needs: build
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     continue-on-error: true
     environment:
