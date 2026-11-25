@@ -1,18 +1,18 @@
 {
-  "version": "1.6.34",
-  "apk": "OpenPlayer-1.6.34.apk",
+  "version": "1.6.35",
+  "apk": "OpenPlayer-1.6.35.apk",
   "download": "/download/android",
-  "size": 11029885,
-  "sha256": "f5d4d4aeba81f2f0862083098b3bc7e32183a7a2099256fbc65dec91d73e1818",
+  "size": 11029933,
+  "sha256": "d80496e838df5f2b5f95b96484d86321823456edf1925ed044c2acba9bb4c617",
   "certSha256": "57:DD:44:FB:86:09:96:FC:D2:84:A9:CD:41:D2:17:4E:4B:51:F7:DD:7E:58:98:B8:A9:48:E1:CF:77:C8:9C:0F",
-  "date": "2026-11-25T17:44:28Z",
+  "date": "2026-11-25T17:49:01Z",
   "virustotal": {
     "status": "skipped",
     "link": "",
     "flagged": null,
     "engines": null
   },
-  "attestation": "https://github.com/adhil-bit/open-palyer/attestations/72285017",
-  "release": "https://github.com/adhil-bit/open-palyer/releases/tag/v1.6.34",
-  "commit": "3d26898163456b19d41c35b4f4f309a77cd38631"
+  "attestation": "https://github.com/adhil-bit/open-palyer/attestations/72287595",
+  "release": "https://github.com/adhil-bit/open-palyer/releases/tag/v1.6.35",
+  "commit": "84ee5977a027b0791f082c55dbba01373dfaf112"
 }
