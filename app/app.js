@@ -3442,7 +3442,9 @@ function watchSeek(target) {
     if (tried >= 1) { ptoast('Jumping doesn’t work for this file. Open ⋮ › Playback details and send a screenshot.', null, null, 5000); return; }
     P.seekRetry[it.id] = tried + 1;
     if (!v.isNative && canGoNative(it)) { P.engineFor[it.id] = 'native'; ptoast('Switching to the all-formats player to jump…'); return load(it, target); }
-    if (v.isNative && it.src && !it.dpath) { P.engineFor[it.id] = 'web'; ptoast('Switching to the standard player to jump…'); return load(it, target); }
+    // Only when the standard engine can play it too (not Dolby/DTS sound, which it plays silent)
+    if (v.isNative && it.src && !it.dpath && it.engineProbe && !it.engineProbe.needsNative) { P.engineFor[it.id] = 'web'; ptoast('Switching to the standard player to jump…'); return load(it, target); }
+    ptoast('Jumping doesn’t work for this file. Open ⋮ › Playback details and send a screenshot.', null, null, 5000);
   }, 3500);
 }
 async function sheetPlaybackDetails() {

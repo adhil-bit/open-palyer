@@ -121,6 +121,18 @@ public class NativePlayerPlugin extends Plugin {
         else main.post(r);
     }
 
+    /**
+     * A whole number sent from JavaScript.
+     *
+     * Not call.getLong(): the bridge parses numbers below 2^31 as Integer, and getLong() only
+     * accepts a Long, so it silently returned the default (0) for every real position. That made
+     * every jump (seek bar, ±10 s, double-tap, resume) restart the video from 0:00.
+     */
+    private static long longArg(PluginCall call, String key, long fallback) {
+        Object v = call.getData().opt(key);
+        return v instanceof Number ? ((Number) v).longValue() : fallback;
+    }
+
     /* ---------------- should this file use the native engine? ---------------- */
 
     @PluginMethod
@@ -226,7 +238,7 @@ public class NativePlayerPlugin extends Plugin {
     public void open(PluginCall call) {
         String path = call.getString("path");
         String uri = call.getString("uri");
-        long startMs = call.getLong("startMs", 0L);
+        long startMs = longArg(call, "startMs", 0L);
         boolean playNow = Boolean.TRUE.equals(call.getBoolean("play", true));
         if (path == null && uri == null) { call.reject("No file"); return; }
         onMain(() -> {
@@ -321,7 +333,7 @@ public class NativePlayerPlugin extends Plugin {
 
     @PluginMethod
     public void seek(PluginCall call) {
-        long ms = call.getLong("ms", 0L);
+        long ms = longArg(call, "ms", 0L);
         onMain(() -> { if (player != null) player.seekTo(Math.max(0, ms)); call.resolve(); });
     }
 
