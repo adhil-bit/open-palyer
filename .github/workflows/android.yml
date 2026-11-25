@@ -36,6 +36,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+          cache: gradle   # reuse downloaded libraries between builds (fewer downloads, no rate limits)
 
       # GitHub's Ubuntu runners already include the Android SDK (ANDROID_HOME).
       # Just accept the licenses so Gradle can fetch any missing platform/build-tools.
