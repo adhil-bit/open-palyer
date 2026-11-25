@@ -316,8 +316,6 @@ public class NativePlayerPlugin extends Plugin {
         onMain(() -> {
             JSObject o = new JSObject();
             o.put("mkv", MkvSeekFix.lastInfo);
-            o.put("rangeServed", RangeWebViewClient.served);
-            o.put("range", RangeWebViewClient.lastInfo);
             if (player != null) {
                 o.put("seekable", player.isCurrentMediaItemSeekable());
                 o.put("position", player.getCurrentPosition());

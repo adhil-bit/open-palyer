@@ -3460,7 +3460,6 @@ async function sheetPlaybackDetails() {
     ['Seekable', P.v.isNative ? String(d.seekable ?? P.v.seekable) : 'n/a'],
     ['Codecs', [d.video, d.audio].filter(Boolean).join(' + ') || '—'],
     ['MKV seek index', d.mkv || '—'],
-    ['Jump requests', `${d.rangeServed ?? 0} served · ${d.range || '—'}`],
     ['Last jumps', P.seekLog.join('<br>') || 'none yet'],
   ];
   openSheet('Playback details', `<div class="diag">${rows.map(([k, v]) => `<div><b>${k}</b><span>${k === 'Last jumps' ? v : esc(String(v))}</span></div>`).join('')}</div>
