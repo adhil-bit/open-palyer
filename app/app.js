@@ -199,11 +199,16 @@ const cleanTag = s => (!s || s === '<unknown>') ? '' : s;
 
 /* ---------------- thumbnails ---------------- */
 let thumbBusy = false;
+let thumbAgain = false;
 async function hydrateThumbs() {
-  if (thumbBusy) return; thumbBusy = true;
-  // Thumbnails for what's on screen first, then everything else.
+  if (thumbBusy) { thumbAgain = true; return; }   // rows changed while busy: look again when done
+  thumbBusy = true;
+  do {
+  thumbAgain = false;
+  // Only the rows that are on screen (the list loads more as you scroll, and asks again then).
+  // Making thumbnails for the whole library at start-up (thousands of songs) slowed the phone down.
   const onScreen = new Set($$('.row[data-id]', listEl).map(r => r.dataset.id));
-  const order = [...lib.items].sort((a, b) => onScreen.has(b.id) - onScreen.has(a.id));
+  const order = lib.items.filter(i => onScreen.has(i.id) || i === P.item);
   for (const it of order) {
     if (it.thumb || it.thumbTried) continue;
     // Let a video that's opening or playing have the phone to itself: making thumbnails reads big
@@ -225,6 +230,7 @@ async function hydrateThumbs() {
     else data = await makeThumb(it.file);
     if (data) { Object.assign(it, data); idb.set(key, data); updateRow(it); }
   }
+  } while (thumbAgain);
   thumbBusy = false;
 }
 function makeThumb(file) {
@@ -330,6 +336,7 @@ function paintRows(head, rows, empty = '') {
   listEl.innerHTML = head + (rows.length ? rows.slice(0, listEl._shown).join('') : empty) +
     (rows.length > listEl._shown ? '<div class="more-rows" id="moreRows"></div>' : '');
   watchMore();
+  setTimeout(hydrateThumbs, 0);   // thumbnails for the rows just shown
 }
 function watchMore() {
   moreObs?.disconnect();
