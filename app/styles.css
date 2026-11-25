@@ -571,3 +571,8 @@ body:has(#player:not([hidden]))::after { display: none; }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .row.skel .thumb, .row.skel .meta i { animation: none; } }
 .more-rows { height: 1px; }
+
+.diag { display: grid; gap: 10px; padding: 4px 18px 8px; font-size: 13.5px; }
+.diag div { display: grid; grid-template-columns: 120px 1fr; gap: 10px; }
+.diag b { color: var(--muted); font-weight: 600; }
+.diag span { word-break: break-word; }

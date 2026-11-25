@@ -38,6 +38,8 @@ import java.util.Map;
 @UnstableApi
 final class MkvSeekFix implements ExtractorsFactory {
     private static final String TAG = "MkvSeekFix";
+    /** What happened with the last file, shown in the app's "Playback details". */
+    static volatile String lastInfo = "No MKV checked yet";
     private final Context ctx;
     private final ExtractorsFactory inner;
 
@@ -101,8 +103,10 @@ final class MkvSeekFix implements ExtractorsFactory {
         public void seekMap(SeekMap map) {
             if (!map.isSeekable()) {
                 SeekMap fixed = null;
-                try { fixed = buildIndex(uri, map.getDurationUs()); } catch (Throwable t) { Log.w(TAG, "index failed", t); }
+                try { fixed = buildIndex(uri, map.getDurationUs()); } catch (Throwable t) { Log.w(TAG, "index failed", t); lastInfo = "No seek index; building one failed: " + t; }
                 if (fixed != null) { o.seekMap(fixed); return; }
+            } else {
+                lastInfo = "File has its own seek index (" + uri.getScheme() + ")";
             }
             o.seekMap(map);
         }
@@ -125,15 +129,15 @@ final class MkvSeekFix implements ExtractorsFactory {
     private SeekMap buildIndex(Uri uri, long durationUs) throws IOException {
         long started = System.currentTimeMillis();
         try (ParcelFileDescriptor pfd = ctx.getContentResolver().openFileDescriptor(uri, "r")) {
-            if (pfd == null) return null;
+            if (pfd == null) { lastInfo = "No seek index; couldn't open the file (" + uri.getScheme() + ")"; return null; }
             try (FileInputStream in = new FileInputStream(pfd.getFileDescriptor())) {
                 FileChannel ch = in.getChannel();
                 long len = ch.size();
-                if (len <= 0) return null;
+                if (len <= 0) { lastInfo = "No seek index; the other app gave a stream, not a file"; return null; }
                 ByteBuffer buf = ByteBuffer.allocate(64);
 
                 El head = readEl(ch, buf, 0, len);
-                if (head == null || head.id != ID_EBML || head.size < 0) return null;   // not Matroska
+                if (head == null || head.id != ID_EBML || head.size < 0) { lastInfo = "Unseekable, and not an MKV file"; return null; }   // not Matroska
                 El seg = readEl(ch, buf, head.data + head.size, len);
                 if (seg == null || seg.id != ID_SEGMENT) return null;
                 long end = seg.size < 0 ? len : Math.min(len, seg.data + seg.size);
@@ -175,7 +179,8 @@ final class MkvSeekFix implements ExtractorsFactory {
                     p = el.data + el.size;
                 }
                 Log.i(TAG, "indexed " + n + " clusters in " + (System.currentTimeMillis() - started) + " ms");
-                if (n < 2) return null;
+                lastInfo = "No seek index in the file; built one from " + n + " clusters in " + (System.currentTimeMillis() - started) + " ms";
+                if (n < 2) { lastInfo = "No seek index; found only " + n + " clusters (file may be incomplete)"; return null; }
                 long dur = durationUs != C.TIME_UNSET && durationUs > 0 ? durationUs : times[n - 1];
                 return new IndexSeekMap(java.util.Arrays.copyOf(times, n), java.util.Arrays.copyOf(pos, n), dur);
             }

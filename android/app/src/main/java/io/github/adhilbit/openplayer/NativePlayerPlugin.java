@@ -298,6 +298,27 @@ public class NativePlayerPlugin extends Plugin {
         onMain(() -> { if (player != null) player.pause(); call.resolve(); });
     }
 
+    /** Details for the app's "Playback details" screen. */
+    @PluginMethod
+    public void diag(PluginCall call) {
+        onMain(() -> {
+            JSObject o = new JSObject();
+            o.put("mkv", MkvSeekFix.lastInfo);
+            o.put("rangeServed", RangeWebViewClient.served);
+            o.put("range", RangeWebViewClient.lastInfo);
+            if (player != null) {
+                o.put("seekable", player.isCurrentMediaItemSeekable());
+                o.put("position", player.getCurrentPosition());
+                o.put("duration", player.getDuration());
+                o.put("state", player.getPlaybackState());
+                androidx.media3.common.Format a = player.getAudioFormat(), v = player.getVideoFormat();
+                o.put("audio", a == null ? "" : String.valueOf(a.sampleMimeType));
+                o.put("video", v == null ? "" : String.valueOf(v.sampleMimeType));
+            }
+            call.resolve(o);
+        });
+    }
+
     @PluginMethod
     public void seek(PluginCall call) {
         long ms = call.getLong("ms", 0L);

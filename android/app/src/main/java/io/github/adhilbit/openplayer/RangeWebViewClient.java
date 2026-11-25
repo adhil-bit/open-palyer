@@ -31,6 +31,9 @@ import java.util.Map;
  */
 public class RangeWebViewClient extends BridgeWebViewClient {
     private static final String TAG = "RangeWebViewClient";
+    /** For "Playback details": how many range requests were answered, and the last one. */
+    static volatile int served = 0;
+    static volatile String lastInfo = "No range requests yet";
     private final Bridge bridge;
 
     public RangeWebViewClient(Bridge bridge) {
@@ -45,6 +48,7 @@ public class RangeWebViewClient extends BridgeWebViewClient {
             if (r != null) return r;
         } catch (Throwable t) {
             Log.w(TAG, "range request failed, falling back", t);
+            lastInfo = "Range request failed: " + t;
         }
         return super.shouldInterceptRequest(view, request);
     }
@@ -70,7 +74,7 @@ public class RangeWebViewClient extends BridgeWebViewClient {
         ParcelFileDescriptor pfd = cr.openFileDescriptor(target, "r");
         if (pfd == null) return null;
         long total = pfd.getStatSize();
-        if (total <= 0) { pfd.close(); return null; }   // a pipe with no known size: let Capacitor try
+        if (total <= 0) { pfd.close(); lastInfo = "Other app gave a stream with no size; can't jump"; return null; }   // a pipe with no known size: let Capacitor try
 
         String spec = range.substring(6).split(",")[0].trim();
         String[] p = spec.split("-", -1);
@@ -96,6 +100,8 @@ public class RangeWebViewClient extends BridgeWebViewClient {
         FileInputStream in = new ParcelFileDescriptor.AutoCloseInputStream(pfd);
         in.getChannel().position(start);
         long length = end - start + 1;
+        served++;
+        lastInfo = "Served bytes " + start + "–" + end + " of " + total;
         headers.put("Content-Range", "bytes " + start + "-" + end + "/" + total);
         headers.put("Content-Length", String.valueOf(length));
         return new WebResourceResponse(mimeOf(cr, target, path), null, 206, "Partial Content", headers, new Limited(in, length));

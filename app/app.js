@@ -842,6 +842,7 @@ const ASPECTS = [
 
 /* --- video element (replaceable, see note in setSource) --- */
 function bindVideo(v) {
+  v.addEventListener('seeking', () => { if (v === P.v && !P.el.hidden) watchSeek(v.currentTime); });
   v.addEventListener('loadedmetadata', onMeta);
   v.addEventListener('timeupdate', onTime);
   v.addEventListener('progress', onBuffer);
@@ -896,6 +897,7 @@ class NativeVideo extends EventTarget {
     if (isFinite(this._d)) t = Math.min(t, Math.max(0, this._d - 0.05));
     if (this.seekable === false) { this._fire('unseekable'); return; }   // the file has no seek index
     this._t = t;
+    watchSeek(t);
     NP.seek({ ms: Math.round(t * 1000) }).then(() => this._fire('seeked')).catch(() => {});
     this._fire('timeupdate');
   }
@@ -1754,6 +1756,7 @@ function sheetMore() {
     (local && !nat ? opt('adelay', 'i-vol', 'Audio delay', `<span class="val">${P.audioDelay ? '+' + Math.round(P.audioDelay * 1000) + ' ms' : 'Off'}</span>`) : '') +
     `<div class="group">Playback</div>` +
     opt('queue', 'i-queue', 'Play queue', `<span class="val">${P.idx + 1} of ${P.queue.length}</span>`) +
+    (NATIVE ? opt('pdiag', 'i-info', 'Playback details<small>Engine, seeking and file info, to share if something goes wrong</small>') : '') +
     opt('shuffle', 'i-shuffle', 'Shuffle', sw(S.shuffle)) +
     opt('playlists', 'i-plist', 'Playlists') +
     opt('repeat', 'i-loop', 'Repeat', `<span class="val">${{ off: 'Off', one: 'This video', all: 'All in list' }[P.repeat]}</span>`) +
@@ -1778,6 +1781,7 @@ function sheetMore() {
     if (o === 'sleep') return sheetSleep();
     if (o === 'info') return sheetMediaInfo();
     if (o === 'queue') return sheetQueue();
+    if (o === 'pdiag') return sheetPlaybackDetails();
     if (o === 'playlists') return sheetPlaylists();
     if (o === 'shuffle') { setShuffle(!S.shuffle); return sheetMore(); }
     if (o === 'repeat') { P.repeat = { off: 'one', one: 'all', all: 'off' }[P.repeat]; P.v.loop = false; sheetMore(); }
@@ -3410,6 +3414,46 @@ function kidsTimeUp() {
 $('#btnKids').onclick = exitKids;
 
 /* automatic fallback: the standard engine sometimes plays the picture but no sound (AC3/DTS) */
+/* ---------- jumping (seek) watchdog ----------
+   If a jump doesn't land (the video errors, or starts again from the beginning), try the other
+   engine at the time asked for instead of leaving the viewer at 0:00. */
+P.seekLog = [];
+function watchSeek(target) {
+  const it = P.item, v = P.v; if (!it || target < 12) return;
+  const engine = v.isNative ? 'All formats' : 'Standard';
+  const token = P.loadToken;
+  clearTimeout(P.seekWatch);
+  P.seekWatch = setTimeout(() => {
+    if (P.item !== it || P.loadToken !== token) return;
+    const at = P.v.currentTime || 0, failed = !!P.v.error || at < target - 8;
+    P.seekLog.unshift(`${fmtTime(target)} → ${fmtTime(at)} (${engine})${failed ? ' — failed' : ''}`); P.seekLog.length = Math.min(P.seekLog.length, 6);
+    if (!failed) return;
+    const tried = (P.seekRetry ||= {})[it.id] || 0;
+    if (tried >= 1) { ptoast('Jumping doesn’t work for this file. Open ⋮ › Playback details and send a screenshot.', null, null, 5000); return; }
+    P.seekRetry[it.id] = tried + 1;
+    if (!v.isNative && canGoNative(it)) { P.engineFor[it.id] = 'native'; ptoast('Switching to the all-formats player to jump…'); return load(it, target); }
+    if (v.isNative && it.src && !it.dpath) { P.engineFor[it.id] = 'web'; ptoast('Switching to the standard player to jump…'); return load(it, target); }
+  }, 3500);
+}
+async function sheetPlaybackDetails() {
+  const it = P.item; if (!it) return;
+  let d = {};
+  try { d = await NP.diag(); } catch {}
+  const src = it.nuri ? (it.nuri.startsWith('content://media') ? 'Phone library' : 'Opened from another app (' + (it.nuri.split('/')[2] || '') + ')') : it.npath ? 'File path' : it.remote ? 'Network link' : 'Picked file';
+  const rows = [
+    ['App version', appInfo?.versionName || APP_VERSION],
+    ['Engine', P.v.isNative ? 'All formats (Media3 + FFmpeg)' : 'Standard (built-in)'],
+    ['Source', src],
+    ['Length', isFinite(P.v.duration) ? fmtTime(P.v.duration) : 'unknown'],
+    ['Seekable', P.v.isNative ? String(d.seekable ?? P.v.seekable) : 'n/a'],
+    ['Codecs', [d.video, d.audio].filter(Boolean).join(' + ') || '—'],
+    ['MKV seek index', d.mkv || '—'],
+    ['Jump requests', `${d.rangeServed ?? 0} served · ${d.range || '—'}`],
+    ['Last jumps', P.seekLog.join('<br>') || 'none yet'],
+  ];
+  openSheet('Playback details', `<div class="diag">${rows.map(([k, v]) => `<div><b>${k}</b><span>${k === 'Last jumps' ? v : esc(String(v))}</span></div>`).join('')}</div>
+    <p class="sheet-note">Take a screenshot of this if jumping or playback doesn’t work, and send it to the developer.</p>`);
+}
 function canGoNative(it) {
   if (DESK && it?.dpath) return !P.hls && P.deskMode[it.id] !== 'direct';
   return !!(P.nv && it && it.native && !it.remote && P.engineFor[it.id] !== 'web' && (it.npath || it.nuri));
