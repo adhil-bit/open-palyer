@@ -134,11 +134,19 @@
     .verified-line svg { width: 18px; height: 18px; }
     .runs { margin-top: 10px; font-size: 14.5px; color: var(--soft); }
     .plats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
-    .plats-label { font-size: 14.5px; color: var(--soft); margin-right: 2px; }
+    .plats-label { font-size: 14.5px; color: var(--soft); flex-basis: 100%; margin-bottom: -2px; }
+    #download .ctas .btn { min-width: 310px; }
     .plats a { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border: 1.5px solid var(--line); border-radius: 999px; text-decoration: none; font-weight: 600; font-size: 15px; background: var(--raised); }
     .plats a:hover { border-color: var(--ink); }
     .plats a[hidden] { display: none; }
     .plats svg { width: 18px; height: 18px; }
+    @media (max-width: 640px) {
+      .ctas { flex-direction: column; }
+      .ctas .btn, #download .ctas .btn { width: 100%; min-width: 0; }
+      .plats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .plats-label { grid-column: 1 / -1; margin: 4px 0 -2px; }
+      .plats a { justify-content: center; border-radius: 10px; padding: 11px 10px; }
+    }
     @media (max-width: 860px) { .hero-body { grid-template-columns: 1fr; gap: 24px; } }
 
     /* comparison table */
@@ -298,7 +306,14 @@
     .stamp { width: 132px; height: 132px; margin: 0 auto 22px; display: block; }
     @media (prefers-reduced-motion: no-preference) { .stamp .ring { transform-origin: 256px 256px; animation: spin 24s linear infinite; } }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .brand .adfree { font: 800 12px var(--text); color: #fff; background: var(--sub); border-radius: 999px; padding: 2px 8px; }
+    .brand { white-space: nowrap; flex-shrink: 0; }
+    .brand .adfree { font: 800 11.5px/1 var(--text); color: #fff; background: var(--sub); border-radius: 999px; padding: 5px 9px; white-space: nowrap; letter-spacing: .02em; text-transform: uppercase; }
+    @media (max-width: 420px) {
+      .brand { font-size: 17px; gap: 7px; }
+      .brand img { width: 24px; height: 24px; }
+      .brand .adfree { font-size: 10px; padding: 4px 7px; }
+      .navcta { font-size: 14.5px; padding: 7px 13px; }
+    }
     .end .ctas { justify-content: center; margin-top: 28px; }
     .end .btn.plain { border-color: #fff; color: #fff; }
     .end .btn.plain:hover { background: #1c1e22; }
@@ -346,7 +361,7 @@
       </div>
 
       <div class="hero-body">
-        <p class="lead">A free, open-source video and music player with the gestures, subtitles and equalizer you’re used to. No ads, no account, no tracking. Install it on Android, or open it in any browser.</p>
+        <p class="lead">A free, open-source video and music player with the gestures, subtitles and equalizer you’re used to. No ads, no account, no tracking. Install it on Android, Windows, Mac or Ubuntu, or open it in any browser.</p>
         <div id="download">
           <div class="ctas">
             <a class="btn main" id="mainDl" data-apk href="https://github.com/adhil-bit/open-palyer/releases/latest" rel="noopener"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>
