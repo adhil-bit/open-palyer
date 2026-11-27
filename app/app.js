@@ -336,6 +336,7 @@ function paintRows(head, rows, empty = '') {
   listEl.innerHTML = head + (rows.length ? rows.slice(0, listEl._shown).join('') : empty) +
     (rows.length > listEl._shown ? '<div class="more-rows" id="moreRows"></div>' : '');
   watchMore();
+  markSel();
   setTimeout(hydrateThumbs, 0);   // thumbnails for the rows just shown
 }
 function watchMore() {
@@ -346,6 +347,7 @@ function watchMore() {
     const rows = listEl._rows || [], from = listEl._shown, to = Math.min(rows.length, from + ROWS_MORE);
     sentinel.insertAdjacentHTML('beforebegin', rows.slice(from, to).join(''));
     listEl._shown = to;
+    markSel();
     if (to >= rows.length) { moreObs.disconnect(); sentinel.remove(); }
     hydrateThumbs();
   }, { root: listEl, rootMargin: '1200px 0px' });
@@ -501,22 +503,23 @@ function renderPlaylists() {
 }
 
 /* long-press on a row → info sheet */
-let rowPress = null, pressFiredAt = 0;
+let rowPress = null, pressFiredAt = 0, pressRow = null;
 listEl.addEventListener('pointerdown', e => {
-  const row = e.target.closest('.row[data-id], .row[data-plist]'); if (!row) return;
+  const row = e.target.closest('.row[data-id], .row[data-plist], .row[data-folder]'); if (!row) return;
   clearTimeout(rowPress);
   if (S.kids?.on) return;   // no menus (delete, rename…) in kids mode
   rowPress = setTimeout(() => {
-    rowPress = null; pressFiredAt = Date.now(); navigator.vibrate?.(15);
+    rowPress = null; pressFiredAt = Date.now(); pressRow = row; navigator.vibrate?.(15);
     if (row.dataset.plist) { const pl = plById(row.dataset.plist); if (pl) sheetPlaylistMenu(pl); }
-    else sheetItemMenu(lib.byId.get(row.dataset.id));
+    else if (lib.selecting) toggleSel(row);
+    else startSelect(row);   // like MX Player: long-press starts selecting
   }, 520);
 });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => listEl.addEventListener(t, () => clearTimeout(rowPress)));
 listEl.addEventListener('scroll', () => clearTimeout(rowPress), { passive: true });
 listEl.addEventListener('contextmenu', e => e.preventDefault());
 listEl.addEventListener('click', e => {
-  if (Date.now() - pressFiredAt < 700) return;   // the release that ended a long-press isn't a tap
+  if (Date.now() - pressFiredAt < 700 && e.target.closest('.row') === pressRow) return;   // the release that ended a long-press isn't a tap
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (act === 'grant') return requestMediaAccess();
   if (act === 'addMusic') return $('#pickMusic').click();
@@ -531,6 +534,7 @@ listEl.addEventListener('click', e => {
   }
   if (act === 'plplay' || act === 'plshuffle') { const pl = plById(lib.playlist); if (pl) playPlaylist(pl, act === 'plshuffle'); return; }
   const row = e.target.closest('.row'); if (!row) return;
+  if (lib.selecting) { if (row.dataset.id || row.dataset.folder) toggleSel(row); return; }
   if (row.dataset.private) return openPrivate();
   if (row.dataset.plist) { lib.playlist = row.dataset.plist; render(); listEl.scrollTop = 0; hydrateThumbs(); return; }
   if (row.dataset.plmiss != null) {
@@ -547,6 +551,106 @@ listEl.addEventListener('click', e => {
   const it = lib.byId.get(row.dataset.id);
   if (it) openPlayer(it, visibleQueueFor(it));
 });
+/* ---------- selecting several (long-press), like MX Player ---------- */
+lib.sel = new Set(); lib.selecting = false;
+const selKey = row => row.dataset.id || (row.dataset.folder ? 'f:' + row.dataset.folder : '');
+function markSel() {
+  if (!lib.selecting) return;
+  listEl.querySelectorAll('.row[data-id], .row[data-folder]').forEach(r => r.classList.toggle('picked', lib.sel.has(selKey(r))));
+}
+function selItems() {   // the videos/songs selected, a selected folder counting as all its videos
+  const out = new Map();
+  for (const k of lib.sel) {
+    if (k.startsWith('f:')) videoItems().filter(i => i.folder === k.slice(2)).forEach(i => out.set(i.id, i));
+    else { const it = lib.byId.get(k); if (it) out.set(it.id, it); }
+  }
+  return [...out.values()];
+}
+function updateSelBar() {
+  const n = lib.sel.size, items = selItems();
+  $('#selCount').textContent = n === 1 && [...lib.sel][0].startsWith('f:') ? `1 folder · ${plural(items.length, 'video')}`
+    : [...lib.sel].some(k => k.startsWith('f:')) ? `${n} selected · ${plural(items.length, 'file')}` : `${n} selected`;
+  $('#selMore').hidden = !(n === 1 && !([...lib.sel][0].startsWith('f:')));
+  $('#selPlay').hidden = !items.length;
+  $('#selDel').setAttribute('aria-label', NATIVE ? 'Delete selected' : 'Remove selected from the list');
+}
+function startSelect(row) {
+  lib.selecting = true; lib.sel.clear();
+  document.body.classList.add('selecting');
+  $('#selbar').hidden = false;
+  toggleSel(row);
+}
+function toggleSel(row) {
+  const k = selKey(row); if (!k) return;
+  lib.sel.has(k) ? lib.sel.delete(k) : lib.sel.add(k);
+  row.classList.toggle('picked', lib.sel.has(k));
+  if (!lib.sel.size) return endSelect();
+  updateSelBar();
+}
+function endSelect() {
+  if (!lib.selecting) return;
+  lib.selecting = false; lib.sel.clear();
+  document.body.classList.remove('selecting');
+  $('#selbar').hidden = true;
+  listEl.querySelectorAll('.row.picked').forEach(r => r.classList.remove('picked'));
+}
+$('#selClose').onclick = endSelect;
+$('#selAll').onclick = () => {
+  const folderRows = $$('.row[data-folder]', listEl);
+  const keys = folderRows.length && !$('.row[data-id]', listEl) ? folderRows.map(selKey) : visibleItems().map(i => i.id);
+  const all = keys.every(k => lib.sel.has(k));
+  if (all) { lib.sel.clear(); return endSelect(); }
+  keys.forEach(k => lib.sel.add(k)); markSel(); updateSelBar();
+};
+$('#selPlay').onclick = () => { const q = selItems(); endSelect(); if (q.length) openPlayer(q[0], q); };
+$('#selMore').onclick = () => { const it = lib.byId.get([...lib.sel][0]); endSelect(); if (it) sheetItemMenu(it); };
+$('#selDel').onclick = async () => {
+  const items = selItems(); if (!items.length) return;
+  const size = fmtSize(items.reduce((a, i) => a + (i.size || 0), 0));
+  if (NATIVE) {
+    if (!(await confirmSheet(`Delete ${plural(items.length, 'file')}?`, `${plural(items.length, 'file')} (${size}) will be permanently deleted from your phone.`, 'Delete', true))) return;
+    endSelect(); deleteMany(items);
+  } else {
+    endSelect(); items.forEach(it => forgetItem(it)); render();
+    snack(`Removed ${plural(items.length, 'file')} from the list. The files stay on your device.`);
+  }
+};
+
+/* ---------- pull down at the top of a list to refresh ---------- */
+(() => {
+  const ind = $('#ptr'); let y0 = null, pull = 0, busy = false;
+  const set = (d, spin) => {
+    ind.style.transform = `translate(-50%, ${Math.min(d, 90) - 50}px) rotate(${d * 3}deg)`;
+    ind.style.opacity = Math.min(1, d / 60);
+    ind.classList.toggle('ready', d > 70); ind.classList.toggle('spin', !!spin);
+  };
+  const reset = () => { ind.style.transition = 'transform .2s, opacity .2s'; set(0); setTimeout(() => ind.style.transition = '', 220); };
+  listEl.addEventListener('touchstart', e => {
+    if (busy || lib.selecting || listEl.scrollTop > 0 || e.touches.length !== 1) { y0 = null; return; }
+    y0 = e.touches[0].clientY; pull = 0;
+  }, { passive: true });
+  listEl.addEventListener('touchmove', e => {
+    if (y0 == null) return;
+    const dy = e.touches[0].clientY - y0;
+    if (dy <= 0 || listEl.scrollTop > 0) { if (pull) { pull = 0; set(0); } return; }
+    pull = dy * 0.5; set(pull);
+  }, { passive: true });
+  listEl.addEventListener('touchend', async () => {
+    if (y0 == null) return; y0 = null;
+    if (pull <= 70) { pull = 0; return reset(); }
+    pull = 0; busy = true; set(75, true); navigator.vibrate?.(10);
+    const before = lib.items.length;
+    try {
+      if (NATIVE) { lastScan = 0; await scanDevice(true); }
+      else if (DESK) await deskRestore();
+      render(); hydrateThumbs();
+    } catch {}
+    busy = false; reset();
+    const diff = lib.items.length - before;
+    snack(diff > 0 ? `Found ${plural(diff, 'new file')}` : diff < 0 ? `${plural(-diff, 'file')} no longer on the device` : 'Library is up to date');
+  });
+})();
+
 function visibleQueueFor(it) {
   if (lib.tab === 'recent') return recents.map(r => lib.byId.get(r.id)).filter(i => i && i.kind === it.kind);
   if (lib.tab === 'folders') return lib.folder ? visibleItems() : sortBy(videoItems().filter(i => i.folder === it.folder), 'videos');
@@ -557,6 +661,7 @@ $$('#musicChips button').forEach(b => b.onclick = () => { lib.musicView = b.data
 /* tabs, search, sort, pickers */
 $$('.tab').forEach(t => t.onclick = () => {
   if (lib.folder === PRIV) privUnlocked = false;
+  endSelect();
   lib.tab = t.dataset.tab; lib.folder = null; lib.group = null; lib.playlist = null;
   $$('.tab').forEach(x => x.classList.toggle('active', x === t));
   renderSoon();
@@ -1312,6 +1417,7 @@ $('#miniClose').onclick = () => {
 window.OPBack = () => {
   try {
     if (!sheet.hidden) { closeSheet(); return 'handled'; }
+    if (lib.selecting) { endSelect(); return 'handled'; }
     if (!P.el.hidden) {
       if (P.locked) { flashUnlock?.(); return 'handled'; }
       closePlayer(); return 'handled';

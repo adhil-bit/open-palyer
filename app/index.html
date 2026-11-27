@@ -29,12 +29,21 @@
         <button class="icon-btn" id="btnSort" aria-label="Sort"><svg><use href="#i-sort"/></svg></button>
         <button class="icon-btn" id="btnSettings" aria-label="Settings"><svg><use href="#i-settings"/></svg></button>
       </div>
+      <div class="selbar" id="selbar" hidden>
+        <button class="icon-btn" id="selClose" aria-label="Stop selecting"><svg><use href="#i-close"/></svg></button>
+        <span class="selcount" id="selCount">1 selected</span>
+        <button class="sel-txt" id="selAll">Select all</button>
+        <button class="icon-btn" id="selPlay" aria-label="Play selected"><svg><use href="#i-play"/></svg></button>
+        <button class="icon-btn" id="selMore" aria-label="More" hidden><svg><use href="#i-more"/></svg></button>
+        <button class="icon-btn danger" id="selDel" aria-label="Delete selected"><svg><use href="#i-trash"/></svg></button>
+      </div>
       <div class="searchbar" id="searchbar" hidden>
         <button class="icon-btn" id="btnSearchClose" aria-label="Close search"><svg><use href="#i-back"/></svg></button>
         <input id="searchInput" type="search" placeholder="Search videos and music" autocomplete="off">
       </div>
     </header>
 
+    <div class="ptr" id="ptr" aria-hidden="true"><svg><use href="#i-refresh"/></svg></div>
     <nav class="tabs" role="tablist">
       <button role="tab" class="tab active" data-tab="folders">Folders</button>
       <button role="tab" class="tab" data-tab="videos">Videos</button>

@@ -582,3 +582,20 @@ body.in-pip .controls, body.in-pip .ptoast, body.in-pip #snackbar, body.in-pip .
 
 /* the thumbnail shown while a video loads fits like the video itself */
 #video { object-fit: contain; background: #000; }
+
+/* selecting several */
+.selbar { position: absolute; inset: 0; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: var(--bg); z-index: 3; }
+.selbar .selcount { flex: 1; font-weight: 700; font-size: 17px; padding-left: 4px; }
+.selbar .sel-txt { background: none; border: 0; color: var(--accent); font: 600 14.5px var(--font, inherit); padding: 8px 10px; }
+.selbar .danger { color: var(--accent); }
+.row.picked { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.row.picked .thumb { position: relative; outline: 2.5px solid var(--accent); outline-offset: -2.5px; }
+.row.picked .thumb::after { content: '✓'; position: absolute; inset: 0; display: grid; place-items: center; font: 800 26px/1 system-ui; color: #fff; background: color-mix(in srgb, var(--accent) 55%, transparent); border-radius: inherit; }
+body.selecting #fab { display: none; }
+/* pull to refresh */
+#library { position: relative; }
+.ptr { position: absolute; left: 50%; top: 118px; z-index: 6; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--surface, #222); box-shadow: 0 4px 14px rgba(0,0,0,.35); opacity: 0; transform: translate(-50%, -50px); pointer-events: none; color: var(--muted); }
+.ptr svg { width: 22px; height: 22px; }
+.ptr.ready { color: var(--accent); }
+.ptr.spin svg { animation: ptrspin .8s linear infinite; }
+@keyframes ptrspin { to { transform: rotate(360deg); } }
