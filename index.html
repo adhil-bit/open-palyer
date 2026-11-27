@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Open Player: the video and music player with no ads</title>
   <meta name="description" content="Open Player is a free, open-source video and music player with no ads and no tracking. Use it as an Android app or straight from your browser on any device.">
-  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#f4f4f1">
   <meta property="og:image:alt" content="Open Player: ad-free, no tracking">
-  <meta name="theme-color" content="#1a1c20" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="app/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="app/icons/icon-192.png">
   <meta property="og:title" content="Open Player: no ads, no tracking">
@@ -15,342 +14,237 @@
   <meta property="og:image" content="app/icons/stamp-1200.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..900&family=Atkinson+Hyperlegible:wght@700&display=swap" rel="stylesheet">
   <script>
     // Opened from an installed home-screen app made before the move? Go straight to the player.
     if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) location.replace('app/');
   </script>
   <style>
-    /* Open Player site. Idea: the page is a screen with subtitles.
-       Subtitle yellow is the one loud colour; everything else stays quiet. */
+    /* Open Player site.
+       Idea: a living-room screen. The hero is the real player, and the headline plays as subtitles on it.
+       The page around it stays plain and light, like a product page made by hand. Red is the brand;
+       subtitle yellow only ever appears on the screen, where it marks ad breaks being cut out. */
     :root {
-      --page: #f6f7f9;
-      --raised: #ffffff;
-      --ink: #22252b;
-      --soft: #5b616b;
-      --line: #dcdfe4;
+      --paper: #f4f4f1;
+      --card: #ffffff;
+      --ink: #1f2430;
+      --slate: #5a6070;
+      --rule: #d9dad5;
+      --red: #e11d48;
+      --red-deep: #b5123a;
+      --yellow: #ffd83d;
       --screen: #000000;
-      --sub: #e11d48;          /* brand cherry */
-      --admark: #ffcc00;       /* ad-break markers, as on video sites */
-      --yes: #187a50;
-      --no: #b8412f;
-      --part: #946200;
+      --yes: #187a50; --no: #b8412f; --part: #946200;
       --focus: #2457ff;
-      --display: 'Archivo', system-ui, sans-serif;
-      --text: 'Atkinson Hyperlegible', system-ui, sans-serif;
+      --sans: 'Schibsted Grotesk', system-ui, sans-serif;
+      --subs: 'Atkinson Hyperlegible', system-ui, sans-serif;
       color-scheme: light;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --page: #1a1c20; --raised: #23262b; --ink: #eceef1; --soft: #a3a9b3; --line: #353941;
-        --yes: #5fd39b; --no: #ff8b78; --part: #f0bf4c; --focus: #8aa6ff;
-        color-scheme: dark;
-      }
     }
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
     html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
     @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-    body { margin: 0; background: var(--page); color: var(--ink); font: 17px/1.6 var(--text); }
-    a { color: inherit; text-underline-offset: 3px; }
-    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 var(--sans); }
+    a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+    a:hover { text-decoration-thickness: 2px; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 3px; }
     svg { flex: none; }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
-    section { scroll-margin-top: 64px; padding: 88px 0 0; }
-    h1, h2, h3 { font-family: var(--display); margin: 0; letter-spacing: -.01em; text-wrap: balance; }
-    h2 { font-size: clamp(30px, 4.4vw, 46px); line-height: 1.05; font-weight: 800; font-stretch: 112%; max-width: 20ch; }
-    h3 { font-size: 19px; font-weight: 700; font-stretch: 105%; line-height: 1.25; }
     p { margin: 0; }
-    .intro { color: var(--soft); max-width: 62ch; margin-top: 14px; font-size: 18px; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+    section { scroll-margin-top: 70px; padding: 104px 0 0; }
+    h1, h2, h3 { margin: 0; text-wrap: balance; }
+    h1 { font: 800 clamp(38px, 5.2vw, 66px)/1.02 var(--sans); letter-spacing: -.025em; }
+    h2 { font: 800 clamp(30px, 3.8vw, 44px)/1.08 var(--sans); letter-spacing: -.02em; max-width: 22ch; }
+    h3 { font: 700 19px/1.3 var(--sans); letter-spacing: -.005em; }
+    .intro { color: var(--slate); max-width: 60ch; margin-top: 16px; font-size: 18px; }
+    .fine { font-size: 14.5px; color: var(--slate); margin-top: 24px; max-width: 80ch; }
+    .fine code, .cmds code { font: 13.5px ui-monospace, Menlo, Consolas, monospace; background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 6px; }
 
-    /* nav */
-    nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--page) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
-    nav .wrap { display: flex; align-items: center; gap: 28px; height: 60px; }
-    .brand { display: flex; align-items: center; gap: 9px; font: 800 19px var(--display); font-stretch: 110%; text-decoration: none; }
-    .brand img { width: 26px; height: 26px; }
-    .navlinks { display: flex; gap: 22px; margin-left: auto; font-size: 15.5px; }
-    .navlinks a { text-decoration: none; color: var(--soft); white-space: nowrap; }
-    .navlinks a:hover { color: var(--ink); }
-    .navcta { font-weight: 700; font-size: 15.5px; text-decoration: none; padding: 8px 16px; border-radius: 8px; background: var(--ink); color: var(--page); }
-    @media (max-width: 960px) { .navlinks { display: none; } .navcta { margin-left: auto; } }
+    /* header bar */
+    .bar { position: sticky; top: 0; z-index: 10; background: var(--paper); border-bottom: 1px solid var(--rule); }
+    .bar .wrap { display: flex; align-items: center; gap: 30px; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 10px; font: 800 20px var(--sans); letter-spacing: -.02em; text-decoration: none; white-space: nowrap; }
+    .brand img { width: 28px; height: 28px; }
+    .menu { display: flex; gap: 24px; margin-left: auto; font-size: 15.5px; }
+    .menu a { text-decoration: none; color: var(--slate); white-space: nowrap; }
+    .menu a:hover { color: var(--ink); }
+    .menu-dl { font-weight: 700; font-size: 15.5px; text-decoration: none; padding: 9px 18px; border-radius: 6px; background: var(--red); color: #fff; }
+    .menu-dl:hover { background: var(--red-deep); }
+    @media (max-width: 980px) { .menu { display: none; } .menu-dl { margin-left: auto; } }
 
-    /* hero: a black screen with the headline as a two-line subtitle */
-    .hero { padding: 28px 0 0; }
-    /* top: copy + download on the left, real screenshots on the right */
-    .top { padding: 44px 0 8px; overflow: hidden; position: relative; isolation: isolate; }
-    /* ---- motion: hero glow, entrance, rotating word, floating shots, ad pop-ups ---- */
-    .top::before, .top::after { content: ''; position: absolute; z-index: -1; width: 620px; height: 620px; border-radius: 50%; filter: blur(90px); opacity: .32; pointer-events: none; }
-    .top::before { background: var(--sub); top: -260px; right: -160px; }
-    .top::after { background: #7c5cff; bottom: -320px; left: -220px; opacity: .18; }
-    .rot { display: inline-block; vertical-align: bottom; overflow: hidden; height: 1.08em; }
-    .rot > span { display: inline-block; }
-    .shots { perspective: 1200px; }
-    .shot-wide, .shot-phone { transition: transform .25s ease-out; will-change: transform; }
-    .shot-wide { position: relative; }
-    .adpops { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 14px; }
-    .adpop { position: absolute; background: #fff; color: #111; border-radius: 10px; padding: 10px 12px; font: 600 13px/1.25 var(--text); box-shadow: 0 12px 30px rgba(0,0,0,.45); max-width: 220px; display: flex; gap: 10px; align-items: center; }
-    .adpop i { font-style: normal; font-size: 10px; font-weight: 800; background: #f5b301; color: #111; border-radius: 4px; padding: 1px 5px; margin-right: 4px; }
-    .adpop .ic { width: 34px; height: 34px; border-radius: 8px; flex: none; display: grid; place-items: center; font-size: 18px; color: #fff; }
-    .adpop small { display: block; font-weight: 500; color: #555; font-size: 11.5px; margin-top: 2px; }
-    .adpop .stampx { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 10px; background: color-mix(in srgb, var(--sub) 18%, transparent); opacity: 0; }
-    .adpop .stampx b { border: 3px solid var(--sub); color: var(--sub); font: 900 18px/1 var(--display); letter-spacing: .08em; padding: 4px 10px; border-radius: 6px; transform: rotate(-12deg) scale(2); opacity: 0; background: rgba(255,255,255,.9); }
-    .adcount { position: absolute; right: 12px; top: -18px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); font-size: 13px; color: var(--soft); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
-    .adcount b { color: var(--ink); }
-    .adcount .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 0 rgba(34,197,94,.6); }
-    .adcount .blk { color: var(--soft); }
-    @media (max-width: 520px) { .adcount { font-size: 11.5px; padding: 5px 9px; top: -14px; } .adcount .blk { display: none; } .adpop { transform: scale(.8); transform-origin: top left; } }
-    /* numbers + format strip */
-    .stats { padding: 26px 0 8px; }
-    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .stats-grid div { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
-    .stats-grid b { display: block; font: 800 38px/1 var(--display); color: var(--sub); }
-    .stats-grid span { display: block; margin-top: 6px; color: var(--soft); font-size: 14.5px; }
-    @media (max-width: 760px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
-    .marquee { margin-top: 22px; overflow: hidden; border-block: 1px solid var(--line); padding: 12px 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
-    .mq-track { display: flex; gap: 12px; width: max-content; }
-    .mq-track span { white-space: nowrap; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--raised); font-weight: 700; font-size: 14px; color: var(--soft); }
-    /* scroll reveal (added by script, so the page works without it) */
-    .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0s); }
-    .reveal.in { opacity: 1; transform: none; }
-    .tcard, .rv, .stats-grid div { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
-    .tcard:hover, .rv:hover, .stats-grid div:hover { transform: translateY(-4px); box-shadow: 0 14px 30px -14px rgba(0,0,0,.5); }
-    @media (prefers-reduced-motion: no-preference) {
-      .top::before { animation: drift1 16s ease-in-out infinite alternate; }
-      .top::after { animation: drift2 19s ease-in-out infinite alternate; }
-      .top-copy > * { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; }
-      .top-copy > :nth-child(2) { animation-delay: .08s; } .top-copy > :nth-child(3) { animation-delay: .16s; }
-      .top-copy > :nth-child(4) { animation-delay: .24s; } .top-copy > :nth-child(5) { animation-delay: .32s; }
-      .shots { animation: rise 1s cubic-bezier(.2,.7,.2,1) .2s both; }
-      .shot-phone img { animation: bob 6s ease-in-out infinite; }
-      .shot-wide img { animation: bob 7s ease-in-out -2s infinite; }
-      .adcount .dot { animation: ping 2s ease-out infinite; }
-      .rot > span.out { animation: wordOut .35s ease-in both; }
-      .rot > span.in { animation: wordIn .45s cubic-bezier(.2,.8,.2,1) both; }
-      .mq-track { animation: marquee 38s linear infinite; }
-      .marquee:hover .mq-track { animation-play-state: paused; }
-      .btn.main { position: relative; overflow: hidden; }
-      .btn.main::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); transform: translateX(-120%); animation: shine 5s ease-in-out 1.5s infinite; pointer-events: none; }
-    }
-    @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } .tcard:hover, .rv:hover, .stats-grid div:hover { transform: none; } }
-    @keyframes drift1 { to { transform: translate(-160px, 120px) scale(1.15); } }
-    @keyframes drift2 { to { transform: translate(200px, -140px) scale(1.1); } }
-    @keyframes rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
-    @keyframes bob { 50% { transform: translateY(-8px); } }
-    @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,.6); } 100% { box-shadow: 0 0 0 10px rgba(34,197,94,0); } }
-    @keyframes wordOut { to { transform: translateY(-110%); opacity: 0; } }
-    @keyframes wordIn { from { transform: translateY(110%); opacity: 0; } to { transform: none; opacity: 1; } }
-    @keyframes marquee { to { transform: translateX(-50%); } }
-    @keyframes shine { 0% { transform: translateX(-120%); } 30%, 100% { transform: translateX(120%); } }
-    .top-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
-    .kicker { display: inline-block; font-weight: 800; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--sub); background: color-mix(in srgb, var(--sub) 12%, transparent); border: 1px solid color-mix(in srgb, var(--sub) 35%, transparent); padding: 6px 12px; border-radius: 999px; }
-    .top h1 { margin: 18px 0 0; font: 800 clamp(36px, 4.6vw, 58px)/1.04 var(--display); font-stretch: 110%; letter-spacing: -.01em; }
-    .top h1 .red { color: var(--sub); }
-    @media (min-width: 400px) { .top h1 .nw { white-space: nowrap; } }
-    .top .lead { font-size: 19px; color: var(--soft); max-width: 46ch; margin: 18px 0 26px; }
-    .dl-meta { margin-top: 12px; font-size: 14px; color: var(--soft); }
-    .trust-row { list-style: none; padding: 0; margin: 20px 0 0; display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14.5px; font-weight: 600; }
-    .trust-row li { display: inline-flex; align-items: center; gap: 6px; }
-    .trust-row svg { width: 17px; height: 17px; color: var(--yes); }
-    .trust-row a { color: inherit; }
-    .shots { position: relative; margin: 0; padding: 0 0 34px 0; }
-    .shot-wide { margin-left: 70px; border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 30px 60px -20px rgba(0,0,0,.45); background: #000; }
-    .shot-wide img { display: block; width: 100%; height: auto; border-radius: 14px; }
-    .shot-phone { position: absolute; left: 0; bottom: 30px; width: 34%; border-radius: 28px; padding: 7px; background: #0b0c0e; box-shadow: 0 24px 50px -12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08) inset; }
-    .shot-phone img { display: block; width: 100%; height: auto; border-radius: 22px; }
-    .shots figcaption { position: absolute; right: 0; bottom: 0; font-size: 12.5px; color: var(--soft); text-align: right; max-width: 62%; }
-    .shots figcaption a { color: inherit; }
-    @media (max-width: 920px) {
-      .top-grid { grid-template-columns: 1fr; gap: 36px; }
-      .shots { max-width: 620px; }
-    }
-    @media (max-width: 520px) { .shot-wide { margin-left: 46px; } .shot-phone { width: 38%; border-radius: 20px; padding: 5px; } .shot-phone img { border-radius: 16px; } .shots figcaption { position: static; margin-top: 10px; } .shots { padding-bottom: 0; } }
-    /* why trust */
-    .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 28px; }
-    /* reviews */
-    .rv-summary { display: flex; align-items: baseline; gap: 10px; margin-top: 18px; font-weight: 700; }
-    .rv-summary b { font-size: 34px; }
-    .rv-summary .st { color: #f5b301; letter-spacing: 2px; }
-    .rv-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 22px; }
-    .rv { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
-    .rv-head { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; color: var(--soft); }
-    .rv-head b { color: var(--ink); font-size: 16px; }
-    .rv .st { color: #f5b301; letter-spacing: 1.5px; margin-top: 4px; }
-    .rv p { margin: 8px 0 0; white-space: pre-line; }
-    .rv-reply { margin-top: 12px; padding: 10px 12px; border-left: 3px solid var(--sub); background: color-mix(in srgb, var(--sub) 7%, transparent); font-size: 14.5px; }
-    .rv-reply small { display: block; font-weight: 700; color: var(--sub); }
-    .rv-empty { color: var(--soft); }
-    .rv-form { margin-top: 30px; max-width: 620px; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: grid; gap: 14px; }
-    .rv-form h3 { margin: 0; font-size: 20px; }
-    .rv-form label { display: grid; gap: 6px; font-weight: 600; font-size: 14.5px; }
-    .rv-form input, .rv-form textarea { font: inherit; font-weight: 400; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--page); color: var(--ink); }
-    .rv-stars { display: flex; gap: 4px; }
-    .rv-stars button { font-size: 30px; line-height: 1; background: none; border: 0; padding: 2px; color: var(--line); cursor: pointer; }
-    .rv-stars button.on { color: #f5b301; }
-    .rv-hp { position: absolute; left: -9999px; }
-    .rv-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-    .rv-msg { font-size: 14.5px; }
-    .rv-msg.err { color: #d33; }
-    .rv-note { font-size: 13px; color: var(--soft); margin: 0; }
-    .tcard { display: block; text-decoration: none; color: inherit; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
-    a.tcard:hover { border-color: var(--ink); }
-    .tcard svg { width: 26px; height: 26px; color: var(--sub); }
-    .tcard b { display: block; font-size: 18px; margin-top: 10px; }
-    .tcard span { display: block; color: var(--soft); font-size: 15px; margin-top: 6px; }
-    .tcard em { display: block; font-style: normal; font-weight: 700; font-size: 14.5px; margin-top: 10px; color: var(--sub); }
-    @media (max-width: 900px) { .trust-grid { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 560px) { .trust-grid { grid-template-columns: 1fr; } }
-    .demo { padding-top: 72px; }
-    /* open source: the mix */
-    .oss-mix { margin-top: 30px; }
-    .oss-mix h3 { font-size: 21px; }
-    .oss-mix ul { list-style: none; padding: 0; margin: 14px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 26px; }
-    .oss-mix li b { display: block; font-size: 16px; }
-    .oss-mix li span { display: block; color: var(--soft); font-size: 15px; margin-top: 2px; }
-    .oss-built { margin-top: 16px; font-size: 14px; color: var(--soft); }
-    @media (max-width: 640px) { .oss-mix ul { grid-template-columns: 1fr; } }
-    .screen { position: relative; background: var(--screen); border-radius: 10px; aspect-ratio: 21 / 9; overflow: hidden;
-      display: flex; align-items: flex-end; justify-content: center; padding: 0 5% 9%; }
-    .screen::before { content: ''; position: absolute; inset: 0; pointer-events: none;
-      background: radial-gradient(ellipse 80% 70% at 50% 35%, #1d1f24 0%, #000 72%); }
-    .screen .h1like { position: relative; text-align: center; font: 700 clamp(26px, 4.1vw, 54px)/1.2 var(--text); letter-spacing: 0;
-      color: #fff; text-shadow: 0 2px 0 #000, 0 0 3px #000, 0 0 14px rgba(0,0,0,.7); }
-    @media (min-width: 641px) { .screen .h1like span { white-space: nowrap; } }
-    .screen .h1like span { display: block; }
-    .badge-hd { position: absolute; top: 18px; right: 20px; font: 600 13px var(--text); color: #9ba1aa; border: 1px solid #3a3d44; border-radius: 4px; padding: 1px 7px; }
-    .player-bar { display: flex; align-items: center; gap: 14px; padding: 12px 4px 0; color: var(--soft); font-size: 14.5px; font-variant-numeric: tabular-nums; }
-    .player-bar svg { width: 22px; height: 22px; color: var(--ink); }
-    .scrub { position: relative; flex: 1; height: 4px; background: var(--line); border-radius: 2px; }
-    .scrub i { position: absolute; inset: 0 auto 0 0; width: 38%; background: var(--ink); border-radius: 2px; }
-    .scrub i::after { content: ''; position: absolute; right: -6px; top: -4px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink); }
-    @media (prefers-reduced-motion: no-preference) { .scrub i { animation: play 2.4s cubic-bezier(.3,.6,.3,1) both .3s; } }
-    @keyframes play { from { width: 0; } }
-    .adbreaks { white-space: nowrap; }
-    .replay { all: unset; cursor: pointer; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; }
-    .replay:hover { background: var(--line); }
-    .scrub em { position: absolute; top: -2px; width: 5px; height: 8px; margin-left: -2px; border-radius: 2px; background: var(--admark); transform: scaleY(0); transition: transform .25s; }
-    .run .scrub em { transform: none; }
-    .scrub em.gone { transform: scale(2.4, 0) !important; opacity: 0; transition: transform .35s, opacity .35s; }
-    .cue { position: absolute; left: 5%; right: 5%; bottom: 9%; text-align: center; margin: 0; font: 700 clamp(20px, 2.8vw, 36px)/1.25 var(--text);
-      color: #fff; text-shadow: 0 2px 0 #000, 0 0 6px #000; opacity: 0; transition: opacity .25s; }
+    /* hero: the real player, with the headline as subtitles */
+    .hero { padding: 32px 0 0; }
+    .screen { container-type: inline-size; position: relative; margin: 0; background: var(--screen); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 0 rgba(0,0,0,.06), 0 28px 60px -30px rgba(31,36,48,.55); }
+    .screen img { display: block; width: 100%; height: auto; }
+    .screen::after { content: ''; position: absolute; inset: 55% 0 0; background: linear-gradient(transparent, rgba(0,0,0,.45)); pointer-events: none; }
+    .cue { position: absolute; z-index: 2; left: 6%; right: 6%; bottom: 20%; text-align: center; font: 700 clamp(12px, 3.3cqi, 38px)/1.25 var(--subs);
+      color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 2px 3px #000, 0 0 14px rgba(0,0,0,.6); opacity: 0; transition: opacity .22s; }
     .cue.on { opacity: 1; }
-    .screen .h1like { transition: opacity .5s, transform .5s; }
-    .run .screen .h1like { opacity: 0; transform: translateY(8px); }
-    .run.done .screen .h1like { opacity: 1; transform: none; }
-    .screen .h1like span:last-child { transition: opacity .4s .35s; }
-    .run:not(.done) .screen .h1like span:last-child { opacity: 0; }
-    .adcard { position: absolute; left: 22px; top: 18px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px;
-      background: rgba(255,255,255,.12); color: #e6e8eb; font-size: 14px; opacity: 0; transform: translateY(10px); transition: opacity .25s, transform .25s; }
-    .adcard b { background: var(--admark); color: #111; border-radius: 3px; padding: 0 6px; font-size: 12.5px; }
-    .adcard s { text-decoration: none; position: absolute; inset: 0; display: grid; place-items: center; border-radius: 6px; background: #111; color: var(--sub);
-      font-weight: 700; transform: scaleX(0); transform-origin: left; transition: transform .3s; color: #fff; background: var(--sub); }
+    .cue b { color: var(--yellow); }
+    /* yellow ad-break marks sit on the screenshot's own seek bar */
+    .marks { position: absolute; z-index: 2; left: 5.94%; right: 5.94%; top: 88.2%; height: 0; }
+    .marks em { position: absolute; top: 0; width: .6%; min-width: 3px; height: clamp(5px, .9vw, 11px); transform: translate(-50%, -50%); background: var(--yellow); border-radius: 1px; transition: transform .35s, opacity .35s; }
+    .marks em.gone { transform: translate(-50%, -50%) scale(3, 0); opacity: 0; }
+    .adcard { position: absolute; z-index: 3; left: 4%; top: 14%; display: flex; align-items: center; gap: 10px; padding: .6em .9em; border-radius: 4px; font: 600 clamp(10px, 1.9cqi, 17px)/1.2 var(--subs);
+      background: rgba(255,255,255,.94); color: #222; box-shadow: 0 10px 30px rgba(0,0,0,.4); opacity: 0; transform: translateY(10px); transition: opacity .22s, transform .22s; overflow: hidden; }
+    .adcard b { background: var(--yellow); color: #111; border-radius: 2px; padding: 0 .4em; font-size: .85em; }
+    .adcard s { text-decoration: none; position: absolute; inset: 0; display: grid; place-items: center; background: var(--red); color: #fff; font-weight: 700; transform: scaleX(0); transform-origin: left; transition: transform .3s; }
     .adcard.on { opacity: 1; transform: none; }
     .adcard.kill s { transform: none; }
-    @media (max-width: 640px) { .adcard { left: 12px; top: 12px; font-size: 12.5px; } .cue { bottom: 12%; } }
-    .adbreaks b { color: var(--ink); }
-    @media (max-width: 640px) {
-      .screen { aspect-ratio: 4 / 3.4; padding-bottom: 12%; }
-      .player-bar .time { display: none; }
-    }
+    .screen-foot { display: flex; align-items: center; gap: 12px; padding: 12px 2px 0; font-size: 14.5px; color: var(--slate); font-variant-numeric: tabular-nums; }
+    .screen-foot b { color: var(--ink); }
+    .replay { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); padding: 4px 8px 4px 4px; border-radius: 4px; }
+    .replay svg { width: 18px; height: 18px; }
+    .replay:hover { background: var(--rule); }
+    .replay:focus-visible { outline: 3px solid var(--focus); }
+    .screen-foot .count { margin-left: auto; }
+    .swatch { display: inline-block; width: 4px; height: 11px; background: var(--yellow); border: 1px solid #c9a400; vertical-align: -1px; margin-right: 6px; }
 
-    .hero-body { display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: start; padding-top: 36px; }
-    .hero-body .lead { font-size: 19px; max-width: 46ch; }
-    .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
-    .btn { display: inline-flex; align-items: center; gap: 12px; padding: 13px 20px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 17px; line-height: 1.2; }
-    .btn svg { width: 24px; height: 24px; }
-    .btn small { display: block; font-weight: 400; font-size: 13.5px; opacity: .8; }
-    .btn.main { background: var(--sub); color: #fff; }
-    .btn.main:hover { background: #be123c; }
-    .btn.plain { border: 1.5px solid var(--ink); }
-    .btn.plain:hover { background: var(--raised); }
-    .verified-line { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 14.5px; color: var(--yes); text-decoration: none; }
-    .verified-line svg { width: 18px; height: 18px; }
-    .runs { margin-top: 10px; font-size: 14.5px; color: var(--soft); }
-    .plats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
-    .plats-label { font-size: 14.5px; color: var(--soft); flex-basis: 100%; margin-bottom: -2px; }
-    #download .ctas .btn { min-width: 310px; }
-    .plats a { display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border: 1.5px solid var(--line); border-radius: 999px; text-decoration: none; font-weight: 600; font-size: 15px; background: var(--raised); }
-    .plats a:hover { border-color: var(--ink); }
-    /* open source band */
-    .oss { position: relative; border: 2px solid var(--sub); border-radius: 18px; padding: 40px; background: linear-gradient(135deg, color-mix(in srgb, var(--sub) 12%, var(--raised)), var(--raised) 60%); overflow: hidden; }
-    .oss-tag { display: inline-flex; align-items: center; gap: 8px; background: var(--sub); color: #fff; font-weight: 800; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; padding: 6px 12px; border-radius: 999px; }
-    .oss-tag svg { width: 16px; height: 16px; }
-    .oss h2 { margin-top: 16px; }
-    .oss-list { list-style: none; padding: 0; margin: 28px 0 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .oss-list li { background: var(--page); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
-    .oss-list b { display: block; font-size: 18px; color: var(--sub); }
-    .oss-list span { display: block; margin-top: 4px; font-size: 15px; color: var(--soft); }
-    .oss-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 28px; }
-    .oss-lic { font-size: 15px; color: var(--soft); }
-    @media (max-width: 900px) { .oss-list { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 640px) { .oss { padding: 24px 18px; } .oss-list { grid-template-columns: 1fr; } .oss-ctas .btn { width: 100%; } }
-    .plats a[hidden] { display: none; }
-    .plats svg { width: 18px; height: 18px; }
-    @media (max-width: 640px) {
-      .ctas { flex-direction: column; }
-      .ctas .btn, #download .ctas .btn { width: 100%; min-width: 0; }
-      .plats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-      .plats-label { grid-column: 1 / -1; margin: 4px 0 -2px; }
-      .plats a { justify-content: center; border-radius: 10px; padding: 11px 10px; }
+    /* a watch page: the video on the left, title and download on the right */
+    .watch { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 44px; align-items: start; }
+    .watch-side h1 { font-size: clamp(36px, 3.3vw, 46px); line-height: 1.05; }
+    .lead { font-size: 18px; color: var(--slate); max-width: 46ch; margin: 16px 0 24px; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    @media (max-width: 1080px) {
+      .watch { display: flex; flex-direction: column; gap: 0; } .watch-main { display: contents; } .watch-side { order: 2; margin-top: 36px; } .facts { order: 3; }
+      .watch-side { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0 48px; align-items: start; }
+      .watch-side h1, .watch-side .lead { grid-column: 1; } .watch-side .getit { grid-column: 2; grid-row: 1 / span 2; }
+      .watch-side h1 { font-size: clamp(36px, 5vw, 56px); }
     }
-    @media (max-width: 860px) { .hero-body { grid-template-columns: 1fr; gap: 24px; } }
+    @media (max-width: 760px) { .watch-side { display: block; } }
+
+    /* download block */
+    .getit { border-top: 4px solid var(--ink); padding-top: 20px; }
+    .btn { display: inline-flex; align-items: center; gap: 14px; padding: 14px 22px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 17px; line-height: 1.2; }
+    .btn svg { width: 24px; height: 24px; }
+    .btn small { display: block; font-weight: 400; font-size: 13.5px; opacity: .85; margin-top: 2px; }
+    .btn.main { background: var(--red); color: #fff; }
+    .btn.main:hover { background: var(--red-deep); }
+    .btn.plain { border: 1.5px solid var(--ink); color: var(--ink); }
+    .btn.plain:hover { background: var(--card); }
+    .ctas { display: flex; flex-direction: column; gap: 10px; }
+    .ctas .btn { width: 100%; }
+    .plats { margin-top: 16px; font-size: 15px; color: var(--slate); display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+    .plats a { color: var(--ink); font-weight: 600; }
+    .plats-label { color: var(--slate); }
+    .runs { margin-top: 12px; font-size: 14px; color: var(--slate); }
+    .dl-meta { margin-top: 14px; font-size: 14px; color: var(--slate); }
+    .verified-line { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14.5px; color: var(--yes); text-decoration: none; }
+    .verified-line svg { width: 18px; height: 18px; }
+    .facts { list-style: none; padding: 0; margin: 22px 0 0; grid-template-columns: 1fr 1fr !important; max-width: 560px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; font-size: 15.5px; }
+    .facts li { display: flex; gap: 8px; align-items: flex-start; }
+    .facts svg { width: 18px; height: 18px; color: var(--yes); margin-top: 4px; }
+    @media (max-width: 420px) { .facts { grid-template-columns: 1fr !important; } }
+
+    /* checks you can do yourself */
+    .checks { margin: 36px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0 56px; }
+    .checks > div { border-top: 1px solid var(--rule); padding: 20px 0 22px; }
+    .checks dt { font-weight: 700; font-size: 18px; }
+    .checks dd { margin: 4px 0 0; color: var(--slate); }
+    .checks dd a { color: var(--ink); font-weight: 600; }
+    @media (max-width: 760px) { .checks { grid-template-columns: 1fr; } }
+
+    /* open source */
+    .oss-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: start; }
+    .freedoms { margin: 0; }
+    .freedoms > div { display: grid; grid-template-columns: 92px 1fr; gap: 16px; padding: 14px 0; border-top: 1px solid var(--rule); }
+    .freedoms dt { font-weight: 800; color: var(--red); }
+    .freedoms dd { margin: 0; color: var(--slate); }
+    .oss-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 28px; }
+    .oss-mix { margin-top: 64px; background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 32px; }
+    .oss-mix h3 { font-size: 22px; }
+    .oss-mix ul { list-style: none; padding: 0; margin: 18px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 40px; }
+    .oss-mix li b { display: block; }
+    .oss-mix li span { display: block; color: var(--slate); font-size: 15.5px; margin-top: 2px; }
+    .oss-built { margin-top: 20px; font-size: 14.5px; color: var(--slate); }
+    @media (max-width: 880px) { .oss-grid { grid-template-columns: 1fr; gap: 32px; } }
+    @media (max-width: 640px) { .oss-mix { padding: 22px 18px; } .oss-mix ul { grid-template-columns: 1fr; } .oss-ctas .btn { width: 100%; } }
 
     /* comparison table */
-    .tablewrap { margin-top: 32px; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); }
+    .tablewrap { margin-top: 32px; overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; background: var(--card); }
     table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 15px; }
-    th, td { text-align: left; vertical-align: top; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    th, td { text-align: left; vertical-align: top; padding: 14px 16px; border-bottom: 1px solid var(--rule); }
     tbody tr:last-child td { border-bottom: 0; }
-    thead th { font: 700 15px var(--display); font-stretch: 105%; padding-top: 18px; background: var(--raised); }
-    thead th small { display: block; font: 400 13px var(--text); color: var(--soft); }
-    td:first-child { font-weight: 700; width: 24%; position: sticky; left: 0; background: var(--raised); }
-    .us { background: color-mix(in srgb, var(--sub) 6%, var(--raised)); }
-    thead .us { box-shadow: inset 0 4px 0 var(--sub); }
-    td small { display: block; color: var(--soft); font-size: 13.5px; line-height: 1.45; margin-top: 3px; }
+    thead th { font: 700 15.5px var(--sans); padding-top: 18px; background: var(--card); }
+    thead th small { display: block; font-weight: 400; font-size: 13px; color: var(--slate); }
+    td:first-child { font-weight: 600; width: 24%; position: sticky; left: 0; background: var(--card); }
+    .us { background: #fdf2f4; }
+    thead .us { box-shadow: inset 0 4px 0 var(--red); }
+    td small { display: block; color: var(--slate); font-size: 13.5px; line-height: 1.45; margin-top: 3px; }
     .v { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
     .v svg { width: 17px; height: 17px; }
     .v.y { color: var(--yes); } .v.n { color: var(--no); } .v.p { color: var(--part); }
-    .group-row td { background: var(--page); font: 700 13.5px var(--text); color: var(--soft); padding: 9px 16px; position: static; }
-    .swipe { display: none; font-size: 14px; color: var(--soft); margin: 20px 0 -20px; }
+    .group-row td { background: var(--paper); font-weight: 700; font-size: 14px; color: var(--slate); padding: 9px 16px; position: static; }
+    .swipe { display: none; font-size: 14px; color: var(--slate); margin: 20px 0 -20px; }
     @media (max-width: 760px) {
       table { min-width: 640px; font-size: 14px; }
       th, td { padding: 12px; }
-      td:first-child { width: 132px; min-width: 132px; box-shadow: 1px 0 0 var(--line); }
+      td:first-child { width: 132px; min-width: 132px; box-shadow: 1px 0 0 var(--rule); }
       .swipe { display: block; }
     }
-    .tablenote { font-size: 13.5px; color: var(--soft); margin-top: 12px; max-width: 90ch; }
-    .verdicts { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 44px; }
+    .tablenote { font-size: 13.5px; color: var(--slate); margin-top: 12px; max-width: 90ch; }
+    .verdicts { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: 48px; }
     .verdicts h3 { margin-bottom: 10px; }
     .verdicts ul { margin: 0; padding-left: 20px; }
     .verdicts li { margin: 6px 0; }
-    .verdicts p { color: var(--soft); }
+    .verdicts p { color: var(--slate); }
     @media (max-width: 760px) { .verdicts { grid-template-columns: 1fr; gap: 28px; } }
 
-    /* features: grouped plain lists */
-    .groups { display: grid; grid-template-columns: repeat(4, 1fr); gap: 36px 32px; margin-top: 40px; }
-    .groups h3 { padding-bottom: 10px; border-bottom: 3px solid var(--ink); margin-bottom: 12px; }
+    /* features */
+    .formats { margin-top: 18px; font-size: 15.5px; color: var(--slate); max-width: 80ch; }
+    .formats b { color: var(--ink); }
+    .groups { display: grid; grid-template-columns: repeat(4, 1fr); gap: 36px 32px; margin-top: 48px; }
+    .groups h3 { padding-bottom: 10px; border-bottom: 3px solid var(--ink); margin-bottom: 10px; }
     .groups ul { list-style: none; margin: 0; padding: 0; }
-    .groups li { padding: 7px 0; font-size: 15.5px; color: var(--soft); }
+    .groups li { padding: 7px 0; font-size: 15px; color: var(--slate); }
     .groups li b { color: var(--ink); display: block; font-size: 16px; }
     @media (max-width: 980px) { .groups { grid-template-columns: 1fr 1fr; } }
     @media (max-width: 560px) { .groups { grid-template-columns: 1fr; } }
 
+    /* night mode: a small black screen with a live waveform */
+    .night { display: grid; grid-template-columns: 1fr 1.4fr; gap: 36px; align-items: center; margin-top: 36px; padding: 30px; border-radius: 8px; background: var(--screen); color: #eceef1; }
+    .night p { color: #a7adb6; margin: 6px 0 16px; max-width: 42ch; }
+    .wave { width: 100%; height: 120px; }
+    .wave rect { fill: var(--red); transition: height .45s ease, y .45s ease; }
+    .wave line { stroke: #444851; stroke-dasharray: 4 6; }
+    .toggle { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 12px; font-weight: 700; }
+    .toggle .knob { width: 46px; height: 26px; border-radius: 13px; background: #3a3e46; position: relative; transition: background .2s; }
+    .toggle .knob::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; }
+    .toggle[aria-pressed="true"] .knob { background: var(--red); }
+    .toggle[aria-pressed="true"] .knob::after { transform: translateX(20px); }
+    .toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: 6px; }
+    @media (max-width: 760px) { .night { grid-template-columns: 1fr; padding: 22px; } }
+
+    /* desktop downloads */
+    .dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
+    .dl a { display: block; padding: 16px 18px; border: 1.5px solid var(--rule); border-radius: 6px; text-decoration: none; background: var(--card); }
+    .dl a:hover { border-color: var(--ink); }
+    .dl a.mine { border-color: var(--ink); box-shadow: inset 0 -4px 0 var(--red); }
+    .dl b { display: block; font-size: 17px; }
+    .dl span { color: var(--slate); font-size: 14.5px; }
+    @media (max-width: 860px) { .dl { grid-template-columns: 1fr 1fr; } }
+
     /* how to use: a real sequence, so numbered */
-    .steps { list-style: none; counter-reset: s; margin: 36px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
-    .steps li { counter-increment: s; }
-    .steps li::before { content: counter(s); display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--ink); color: var(--page); font: 800 17px var(--display); margin-bottom: 14px; }
-    .steps p { color: var(--soft); margin-top: 6px; }
-    @media (max-width: 760px) { .steps { grid-template-columns: 1fr; gap: 26px; } }
-    .gdemo-wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) 1fr; gap: 40px; align-items: center; margin-top: 44px; }
-    .gscreen { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 14px; overflow: hidden;
-      background-image: radial-gradient(ellipse 70% 60% at 50% 40%, #23262c, #000 75%); }
+    .use-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 56px; align-items: start; }
+    .steps { list-style: none; counter-reset: s; margin: 32px 0 0; padding: 0; }
+    .steps li { counter-increment: s; display: grid; grid-template-columns: 48px 1fr; padding: 18px 0; border-top: 1px solid var(--rule); }
+    .steps li::before { content: counter(s); font: 800 30px/1 var(--sans); color: var(--red); }
+    .steps p { color: var(--slate); margin-top: 4px; grid-column: 2; }
+    .phone { margin: 0; border-radius: 30px; padding: 8px; background: #101114; box-shadow: 0 30px 50px -24px rgba(31,36,48,.6); }
+    .phone img { display: block; width: 100%; height: auto; border-radius: 23px; }
+    @media (max-width: 880px) { .use-grid { grid-template-columns: 1fr; } .phone { max-width: 260px; } }
+    .gdemo-wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) 1fr; gap: 40px; align-items: center; margin-top: 56px; }
+    .gscreen { position: relative; aspect-ratio: 16 / 9; background: #000 url(img/shot-player.webp) center / cover; border-radius: 8px; overflow: hidden; }
+    .gscreen::before { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.35); }
     .gscreen::after { content: ''; position: absolute; inset: 0; background: #000; opacity: var(--dim, 0); transition: opacity .2s; pointer-events: none; }
     .fing { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: rgba(255,255,255,.85);
       box-shadow: 0 0 0 8px rgba(255,255,255,.18); opacity: 0; left: 50%; top: 50%; z-index: 2; }
-    .ghud { position: absolute; left: 50%; top: 16%; transform: translateX(-50%); background: rgba(20,20,22,.8); color: #fff; border-radius: 10px;
+    .ghud { position: absolute; left: 50%; top: 16%; transform: translateX(-50%); background: rgba(20,20,22,.82); color: #fff; border-radius: 8px;
       padding: 8px 14px; font-size: 14px; min-width: 150px; text-align: center; opacity: 0; transition: opacity .2s; z-index: 3; }
     .ghud div { height: 4px; background: rgba(255,255,255,.2); border-radius: 2px; margin-top: 6px; overflow: hidden; }
-    .ghud i { display: block; height: 100%; width: 50%; background: var(--sub); transition: width .9s ease-in-out; }
+    .ghud i { display: block; height: 100%; width: 50%; background: var(--red); transition: width .9s ease-in-out; }
     .gdemo.show .ghud { opacity: 1; }
-    .gcap { margin-top: 12px; color: var(--soft); font-size: 15px; min-height: 1.6em; }
+    .gcap { margin-top: 12px; color: var(--slate); font-size: 15px; min-height: 1.6em; }
     .gdemo[data-g] .fing.f1 { opacity: 1; animation: var(--anim) 2s ease-in-out both; }
     .gdemo[data-g="bright"] { --anim: gUpL; } .gdemo[data-g="vol"] { --anim: gUpR; } .gdemo[data-g="seek"] { --anim: gSide; }
     .gdemo[data-g="dbl"] { --anim: gDbl; } .gdemo[data-g="hold"] { --anim: gHold; } .gdemo[data-g="pinch"] { --anim: gPinchA; }
@@ -362,108 +256,90 @@
     @keyframes gHold { 0% { left: 50%; top: 60%; opacity: 0; transform: scale(1.2); } 15% { opacity: 1; transform: scale(.85); } 80% { opacity: 1; transform: scale(.85); } 100% { opacity: 0; transform: scale(1.2); left: 50%; top: 60%; } }
     @keyframes gPinchA { 0% { left: 45%; top: 55%; opacity: 0; } 12% { opacity: 1; } 70% { left: 30%; top: 70%; opacity: 1; } 100% { left: 30%; top: 70%; opacity: 0; } }
     @keyframes gPinchB { 0% { left: 55%; top: 45%; opacity: 0; } 12% { opacity: 1; } 70% { left: 70%; top: 30%; opacity: 1; } 100% { left: 70%; top: 30%; opacity: 0; } }
-    .gscreen .rip { position: absolute; right: 6%; top: 50%; transform: translateY(-50%); color: #fff; font-weight: 700; opacity: 0; }
+    .gscreen .rip { position: absolute; right: 6%; top: 50%; transform: translateY(-50%); color: #fff; font-weight: 700; opacity: 0; z-index: 2; }
     .gdemo[data-g="dbl"] .rip { animation: rip 2s both; }
     @keyframes rip { 0%, 20% { opacity: 0; } 30%, 70% { opacity: 1; } 100% { opacity: 0; } }
-    .gestures { display: grid; grid-template-columns: 1fr; border-top: 1px solid var(--line); }
-    .gestures div { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; font-size: 15.5px;
+    .gestures { display: grid; grid-template-columns: 1fr; border-top: 1px solid var(--rule); }
+    .gestures div { padding: 12px 14px; border-bottom: 1px solid var(--rule); display: flex; justify-content: space-between; gap: 12px; font-size: 15.5px;
       cursor: pointer; border-left: 4px solid transparent; transition: background .2s, border-color .2s; }
-    .gestures div.on { background: color-mix(in srgb, var(--sub) 10%, transparent); border-left-color: var(--sub); }
-    .gestures span { color: var(--soft); text-align: right; }
+    .gestures div.on { background: #fdf2f4; border-left-color: var(--red); }
+    .gestures span { color: var(--slate); text-align: right; }
     @media (max-width: 860px) { .gdemo-wrap { grid-template-columns: 1fr; gap: 20px; } }
-
-    /* night mode demo */
-    .night { display: grid; grid-template-columns: 1fr 1.4fr; gap: 36px; align-items: center; margin-top: 32px; padding: 28px; border-radius: 14px; background: #000; color: #e9ebee; }
-    .night p { color: #a7adb6; margin: 6px 0 16px; max-width: 42ch; }
-    .wave { width: 100%; height: 120px; }
-    .wave rect { fill: var(--sub); transition: height .45s ease, y .45s ease; }
-    .wave line { stroke: #444851; stroke-dasharray: 4 6; }
-    .toggle { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 12px; font-weight: 700; }
-    .toggle .knob { width: 46px; height: 26px; border-radius: 13px; background: #3a3e46; position: relative; transition: background .2s; }
-    .toggle .knob::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; }
-    .toggle[aria-pressed="true"] .knob { background: var(--sub); }
-    .toggle[aria-pressed="true"] .knob::after { transform: translateX(20px); }
-    .toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: 6px; }
-    @media (max-width: 760px) { .night { grid-template-columns: 1fr; padding: 22px; } }
-
-    /* comparison: Open Player's checks draw in when the table comes into view */
-    .tablewrap .us .v svg { stroke-dasharray: 26; stroke-dashoffset: 0; }
-    .anim .tablewrap .us .v { opacity: 0; transform: translateX(-6px); }
-    .anim .tablewrap .us .v svg { stroke-dashoffset: 26; }
-    .anim.seen .tablewrap .us .v { opacity: 1; transform: none; transition: opacity .35s var(--d), transform .35s var(--d); }
-    .anim.seen .tablewrap .us .v svg { stroke-dashoffset: 0; transition: stroke-dashoffset .45s calc(var(--d) + .1s) ease-out; }
-    .anim thead .us { box-shadow: inset 0 0 0 var(--sub); }
-    .anim.seen thead .us { box-shadow: inset 0 4px 0 var(--sub); transition: box-shadow .5s; }
-
-    /* desktop downloads */
-    .dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
-    .dl a { display: block; padding: 16px 18px; border: 1.5px solid var(--line); border-radius: 10px; text-decoration: none; background: var(--raised); }
-    .dl a:hover { border-color: var(--ink); }
-    .dl a.mine { border-color: var(--ink); box-shadow: inset 0 -4px 0 var(--sub); }
-    .dl b { display: block; font-size: 17px; }
-    .dl span { color: var(--soft); font-size: 14.5px; }
-    .fine code { font: 13.5px ui-monospace, Menlo, Consolas, monospace; background: var(--raised); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
-    @media (max-width: 860px) { .dl { grid-template-columns: 1fr 1fr; } }
-
-    /* every device */
-    .devices { margin-top: 30px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+    .devices { margin-top: 48px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
     .devices h3 { font-size: 17px; }
-    .devices p { color: var(--soft); font-size: 15px; margin-top: 4px; }
+    .devices p { color: var(--slate); font-size: 15px; margin-top: 4px; }
     @media (max-width: 860px) { .devices { grid-template-columns: 1fr 1fr; } }
 
     /* privacy */
-    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 34px; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: 34px; }
     .cols ul { margin: 12px 0 0; padding-left: 20px; }
     .cols li { margin: 8px 0; }
-    .cols li::marker { color: var(--soft); }
+    .cols li::marker { color: var(--slate); }
     @media (max-width: 760px) { .cols { grid-template-columns: 1fr; gap: 30px; } }
-    .fine { font-size: 14.5px; color: var(--soft); margin-top: 24px; max-width: 80ch; }
 
     /* verify: a spec sheet */
-    .spec { margin-top: 32px; border: 1px solid var(--line); border-radius: 10px; background: var(--raised); }
-    .spec > div { display: grid; grid-template-columns: 220px 1fr auto; gap: 16px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+    .spec { margin-top: 32px; border: 1px solid var(--rule); border-radius: 8px; background: var(--card); }
+    .spec > div { display: grid; grid-template-columns: 220px 1fr auto; gap: 16px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--rule); }
     .spec > div:last-child { border-bottom: 0; }
     .spec dt { font-weight: 700; }
     .spec dd { margin: 0; min-width: 0; }
-    .spec dd small { display: block; color: var(--soft); font-size: 14px; }
+    .spec dd small { display: block; color: var(--slate); font-size: 14px; }
     .spec code { font: 14px/1.5 ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; word-break: break-all; }
     .good { color: var(--yes); } .warn { color: var(--no); }
-    .copy { font: 700 14px var(--text); color: var(--ink); background: none; border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+    .copy { font: 700 14px var(--sans); color: var(--ink); background: none; border: 1.5px solid var(--rule); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
     .copy.done { border-color: var(--yes); color: var(--yes); }
     @media (max-width: 700px) { .spec > div { grid-template-columns: 1fr auto; } .spec dt { grid-column: 1 / -1; } }
     .cmds { list-style: none; padding: 0; margin: 12px 0 0; }
     .cmds li { display: flex; gap: 12px; align-items: baseline; padding: 6px 0; flex-wrap: wrap; }
     .cmds b { width: 74px; }
-    .cmds code { font: 14px ui-monospace, Menlo, Consolas, monospace; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+
+    /* reviews */
+    .rv-summary { display: flex; align-items: baseline; gap: 10px; margin-top: 18px; font-weight: 700; }
+    .rv-summary b { font-size: 34px; }
+    .rv-summary .st, .rv .st { color: #e0a100; letter-spacing: 2px; }
+    .rv-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0 32px; margin-top: 22px; }
+    .rv { border-top: 1px solid var(--rule); padding: 18px 0; }
+    .rv-head { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; color: var(--slate); }
+    .rv-head b { color: var(--ink); font-size: 16px; }
+    .rv p { margin: 8px 0 0; white-space: pre-line; }
+    .rv-reply { margin-top: 12px; padding: 10px 12px; border-left: 3px solid var(--red); background: #fdf2f4; font-size: 14.5px; }
+    .rv-reply small { display: block; font-weight: 700; color: var(--red); }
+    .rv-empty { color: var(--slate); }
+    .rv-form { margin-top: 36px; max-width: 620px; background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 24px; display: grid; gap: 14px; }
+    .rv-form h3 { font-size: 20px; }
+    .rv-form label { display: grid; gap: 6px; font-weight: 600; font-size: 14.5px; }
+    .rv-form input, .rv-form textarea { font: inherit; font-weight: 400; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+    .rv-stars { display: flex; gap: 4px; }
+    .rv-stars button { font-size: 30px; line-height: 1; background: none; border: 0; padding: 2px; color: var(--rule); cursor: pointer; }
+    .rv-stars button.on { color: #e0a100; }
+    .rv-hp { position: absolute; left: -9999px; }
+    .rv-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .rv-msg { font-size: 14.5px; }
+    .rv-msg.err { color: #c62828; }
+    .rv-note { font-size: 13px; color: var(--slate); margin: 0; }
 
     /* faq */
-    .faq { max-width: 760px; margin-top: 26px; }
-    details { border-bottom: 1px solid var(--line); }
+    .faq { max-width: 780px; margin-top: 26px; }
+    details { border-bottom: 1px solid var(--rule); }
     summary { cursor: pointer; padding: 18px 0; font-weight: 700; font-size: 18px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
     summary::-webkit-details-marker { display: none; }
-    summary::after { content: '+'; font: 400 24px/1 var(--display); color: var(--soft); }
+    summary::after { content: '+'; font: 400 24px/1 var(--sans); color: var(--slate); }
     details[open] summary::after { content: '−'; }
-    details p { padding: 0 0 18px; color: var(--soft); max-width: 66ch; }
+    details p { padding: 0 0 18px; color: var(--slate); max-width: 66ch; }
 
     /* closing screen */
-    .end { margin-top: 96px; background: var(--screen); color: #fff; padding: 72px 0; text-align: center; }
-    .end p.cap { font: 700 clamp(24px, 3.6vw, 40px)/1.25 var(--text); color: #fff; text-shadow: 0 2px 0 #000; }
-    .stamp { width: 132px; height: 132px; margin: 0 auto 22px; display: block; }
-    @media (prefers-reduced-motion: no-preference) { .stamp .ring { transform-origin: 256px 256px; animation: spin 24s linear infinite; } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .brand { white-space: nowrap; flex-shrink: 0; }
-    .brand .adfree { font: 800 11.5px/1 var(--text); color: #fff; background: var(--sub); border-radius: 999px; padding: 5px 9px; white-space: nowrap; letter-spacing: .02em; text-transform: uppercase; }
-    @media (max-width: 420px) {
-      .brand { font-size: 17px; gap: 7px; }
-      .brand img { width: 24px; height: 24px; }
-      .brand .adfree { font-size: 10px; padding: 4px 7px; }
-      .navcta { font-size: 14.5px; padding: 7px 13px; }
-    }
-    .end .ctas { justify-content: center; margin-top: 28px; }
+    .end { margin-top: 112px; background: var(--screen); color: #fff; padding: 80px 0 72px; text-align: center; }
+    .end .cap { font: 700 clamp(24px, 3.6vw, 40px)/1.25 var(--subs); text-shadow: 0 2px 0 #000; }
+    .end .cap b { color: var(--yellow); }
+    .stamp { width: 112px; height: 112px; margin: 0 auto 26px; display: block; }
+    .end .ctas { flex-direction: row; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+    .end .ctas .btn { width: auto; }
     .end .btn.plain { border-color: #fff; color: #fff; }
     .end .btn.plain:hover { background: #1c1e22; }
     footer { background: var(--screen); color: #9ba1aa; font-size: 14px; padding: 0 0 40px; }
     footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 32px; border-top: 1px solid #2a2d33; padding-top: 22px; }
+    @media (max-width: 640px) { .end .ctas .btn { width: 100%; } section { padding-top: 80px; } .screen { border-radius: 6px; } }
+    @media (max-width: 420px) { .brand { font-size: 18px; } .menu-dl { padding: 8px 14px; font-size: 15px; } }
   </style>
 </head>
 <body>
@@ -483,135 +359,109 @@
     </defs>
   </svg>
 
-  <nav>
+  <header class="bar">
     <div class="wrap">
-      <a class="brand" href="#top"><img src="app/icons/icon.svg" alt="">Open Player<span class="adfree">ad-free</span></a>
-      <div class="navlinks"><a href="#trust">Why trust it</a><a href="#opensource">Open source</a><a href="#features">Features</a><a href="#compare">Compare</a><a href="#desktop">Desktop</a><a href="#reviews">Reviews</a><a href="#faq">FAQ</a></div>
-      <a class="navcta" href="#download">Download</a>
-    </div>
-  </nav>
-
-  <header class="top" id="top">
-    <div class="wrap top-grid">
-      <div class="top-copy">
-        <span class="kicker">Your media. Your control.</span>
-        <h1><span class="nw">Watch your <span class="rot" id="rotWord" aria-live="off"><span>videos.</span></span></span><br><span class="red">Not ads.</span></h1>
-        <p class="lead">Open Player is a free, open-source video and music player. The gestures, subtitles and equalizer you know from MX Player and VLC, with no ads, no account and no tracking.</p>
-        <div id="download">
-          <div class="ctas">
-            <a class="btn main" id="mainDl" data-apk href="/download/android"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>
-            <a class="btn plain" href="app/"><svg><use href="#globe"/></svg><span>Open in your browser<small>No install needed</small></span></a>
-          </div>
-          <div class="plats" id="plats">
-            <span class="plats-label">Also for</span>
-            <a data-p="android" data-apk href="/download/android"><svg><use href="#android"/></svg>Android</a>
-            <a data-p="win" href="/download/windows"><svg><use href="#pc"/></svg>Windows</a>
-            <a data-p="mac" href="/download/mac"><svg><use href="#pc"/></svg>Mac</a>
-            <a data-p="linux" href="/download/ubuntu"><svg><use href="#pc"/></svg>Ubuntu</a>
-            <a data-p="ios" href="#iphone"><svg><use href="#phone"/></svg>iPhone &amp; iPad</a>
-          </div>
-          <p class="runs" id="iphone">On iPhone or iPad, <a href="app/">open the web app</a> in Safari, then tap Share › <b>Add to Home Screen</b>. It installs like an app. Apple only allows App Store apps, so there’s no download. Other Linux: <a href="#desktop">AppImage</a>. Very old Android phone? Get the <a href="/download/android-32bit">32-bit version</a>.</p>
-          <p class="dl-meta" id="dlMeta">Free · No sign-up · Android 7.0 or newer</p>
-          <a class="verified-line" href="#verify" id="verifiedLine" hidden><svg><use href="#shield"/></svg><span id="verifiedText"></span></a>
-        </div>
-        <ul class="trust-row" aria-label="Why it’s safe">
-          <li><svg><use href="#ok"/></svg>No ads, ever</li>
-          <li><svg><use href="#ok"/></svg>No account</li>
-          <li><svg><use href="#ok"/></svg><a href="/github">Open source</a></li>
-          <li><svg><use href="#ok"/></svg><a href="#verify">Virus-scanned</a></li>
-        </ul>
-      </div>
-      <figure class="shots" aria-label="Screenshots of Open Player">
-        <div class="shot-wide"><img src="img/shot-player.webp" width="1280" height="720" alt="Open Player playing a video, with the seek bar, skip and subtitle buttons">
-          <div class="adpops" id="adPops" aria-hidden="true"></div>
-          <div class="adcount" aria-hidden="true"><span class="dot"></span>Ads shown to you: <b>0</b><span class="blk">· pop-ups blocked: <b id="adBlocked">0</b></span></div>
-        </div>
-        <div class="shot-phone"><img src="img/shot-library.webp" width="780" height="1688" alt="Open Player’s video library on a phone"></div>
-      </figure>
+      <a class="brand" href="#top"><img src="app/icons/icon.svg" alt="">Open Player</a>
+      <nav class="menu" aria-label="Sections"><a href="#features">Features</a><a href="#compare">Compare</a><a href="#desktop">On a computer</a><a href="#opensource">Open source</a><a href="#reviews">Reviews</a><a href="#faq">Questions</a></nav>
+      <a class="menu-dl" href="#download">Download</a>
     </div>
   </header>
 
-  <!-- numbers + formats strip -->
-  <section class="stats" aria-label="Open Player in numbers">
-    <div class="wrap stats-grid">
-      <div><b data-count="0">0</b><span>ads, ever</span></div>
-      <div><b data-count="0">0</b><span>trackers</span></div>
-      <div><b data-count="20" data-plus>20+</b><span>video &amp; audio formats</span></div>
-      <div><b data-count="5">5</b><span>platforms: Android, Windows, Mac, Ubuntu, web</span></div>
-    </div>
-    <div class="marquee" aria-hidden="true"><div class="mq-track">
-      <span>MKV</span><span>MP4</span><span>HEVC · x265</span><span>AV1</span><span>WebM</span><span>AVI</span><span>MOV</span><span>Dolby AC3</span><span>E-AC3</span><span>DTS</span><span>TrueHD</span><span>FLAC</span><span>MP3</span><span>Opus</span><span>SRT</span><span>ASS / SSA</span><span>PGS subtitles</span><span>4K HDR</span>
-    </div></div>
-  </section>
+  <main>
+  <div class="hero" id="top">
+    <div class="wrap">
+      <div class="watch">
+        <div class="watch-main">
+        <figure class="screen" id="screen">
+          <img src="img/shot-player.webp" width="1280" height="720" alt="Open Player playing a video, with the seek bar, skip and subtitle buttons">
+          <div class="adcard" id="adcard" aria-hidden="true"><b>Ad</b><span>Your video resumes in 5</span><s>Removed</s></div>
+          <div class="marks" id="marks" aria-hidden="true"><em class="gone" style="left:18%"></em><em class="gone" style="left:52%"></em><em class="gone" style="left:81%"></em></div>
+          <p class="cue on" id="cue" aria-hidden="true">Open Player just plays your video. <b>No ads.</b></p>
+        </figure>
+        <div class="screen-foot">
+          <button class="replay" id="replay" type="button"><svg><use href="#play"/></svg>Play again</button>
+          <span class="count" aria-live="polite"><span class="swatch" aria-hidden="true"></span>Ad breaks in this video: <b id="adn">none</b></span>
+        </div>
 
-  <!-- WHY TRUST -->
+          <ul class="facts" aria-label="Why it’s safe">
+            <li><svg><use href="#ok"/></svg>No ads, ever</li>
+            <li><svg><use href="#ok"/></svg>No sign-in</li>
+            <li><svg><use href="#ok"/></svg><a href="/github">Code public on GitHub</a></li>
+            <li><svg><use href="#ok"/></svg><a href="#verify">Every release virus-scanned</a></li>
+          </ul>
+        </div>
+        <div class="watch-side">
+          <h1>The video and music player with no ads.</h1>
+          <p class="lead">Open Player is free and open source. It has the gestures, subtitles and equalizer you know from MX Player and VLC, and <strong>no ads, no account and no tracking</strong>.</p>
+          <div class="getit" id="download">
+            <div class="ctas">
+              <a class="btn main" id="mainDl" data-apk href="/download/android"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>
+              <a class="btn plain" href="app/"><svg><use href="#globe"/></svg><span>Open in your browser<small>No install needed</small></span></a>
+            </div>
+            <p class="plats" id="plats">
+              <span class="plats-label">Also for</span>
+              <a data-p="android" data-apk href="/download/android">Android</a>
+              <a data-p="win" href="/download/windows">Windows</a>
+              <a data-p="mac" href="/download/mac">Mac</a>
+              <a data-p="linux" href="/download/ubuntu">Ubuntu</a>
+              <a data-p="ios" href="#iphone">iPhone and iPad</a>
+            </p>
+            <p class="runs" id="iphone">On iPhone or iPad, <a href="app/">open the web app</a> in Safari, then tap Share › <b>Add to Home Screen</b>. Apple only allows App Store apps, so there’s no download. Other Linux: <a href="#desktop">AppImage</a>. Very old Android phone? Get the <a href="/download/android-32bit">32-bit version</a>.</p>
+            <p class="dl-meta" id="dlMeta">Free, no sign-up. Android 7.0 or newer.</p>
+            <a class="verified-line" href="#verify" id="verifiedLine" hidden><svg><use href="#shield"/></svg><span id="verifiedText"></span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <section id="trust">
     <div class="wrap">
-      <h2>Why trust Open Player?</h2>
-      <p class="intro">You shouldn’t have to take an app’s word for it. Here’s what you can check yourself.</p>
-      <div class="trust-grid">
-        <a class="tcard" href="/github"><svg><use href="#code"/></svg><b>Open source</b><span>Every line of code is public on GitHub under the GPL-3.0 licence. Anyone can read it.</span><em>See the code ›</em></a>
-        <div class="tcard"><svg><use href="#no"/></svg><b>No ads, no trackers</b><span>No ad networks, no analytics and no sign-in. Your videos never leave your device.</span></div>
-        <div class="tcard"><svg><use href="#shield"/></svg><b>Clear permissions</b><span>It reads your videos and music to list them. Internet is only for streams and links you open. “All files access” is optional, for hidden folders.</span></div>
-        <a class="tcard" href="/releases"><svg><use href="#ok"/></svg><b>Built in public</b><span>Every APK is built automatically by GitHub from the public code. Nothing is built by hand.</span><em>See all releases ›</em></a>
-        <a class="tcard" href="#verify"><svg><use href="#shield"/></svg><b>Virus-scanned</b><span id="trustVt">Each release is scanned by dozens of antivirus engines on VirusTotal, and the report is public.</span><em>See the result ›</em></a>
-        <a class="tcard" href="#verify"><svg><use href="#ok"/></svg><b>Check your download</b><span>Compare the file’s SHA-256 checksum and signing fingerprint with the ones published here.</span><em>How to check ›</em></a>
-      </div>
+      <h2>You don’t have to take our word for it</h2>
+      <p class="intro">Any app can say it has no ads. Here’s what you can check for yourself.</p>
+      <dl class="checks">
+        <div><dt>The code is public</dt><dd>Every line is on GitHub under the GPL-3.0 licence, so anyone can read it. <a href="/github">See the code</a></dd></div>
+        <div><dt>No ads, no trackers</dt><dd>No ad networks, no analytics and no sign-in. Your videos never leave your device.</dd></div>
+        <div><dt>Built by GitHub, not by hand</dt><dd>Each APK is built automatically from the public code. <a href="/releases">See all releases</a></dd></div>
+        <div><dt>Scanned for viruses</dt><dd><span id="trustVt">Each release is scanned by dozens of antivirus engines on VirusTotal, and the report is public.</span> <a href="#verify">See the result</a></dd></div>
+        <div><dt>Permissions you can understand</dt><dd>It reads your videos and music to list them. The internet is only for streams and links you open. “All files access” is optional, for hidden folders.</dd></div>
+        <div><dt>A download you can verify</dt><dd>Compare the file’s checksum and signing fingerprint with the ones on this page. <a href="#verify">How to check</a></dd></div>
+      </dl>
     </div>
   </section>
 
-  <!-- DEMO: what "ad-free" looks like -->
-  <section class="hero demo" id="demo" aria-label="What ad-free looks like">
-    <div class="wrap">
-      <div class="screen" id="screen">
-        <span class="badge-hd" aria-hidden="true">CC</span>
-        <div class="adcard" id="adcard" aria-hidden="true"><b>Ad</b><span>Your video resumes in 5</span><s>Removed</s></div>
-        <p class="cue" id="cue" aria-hidden="true"></p>
-        <p class="h1like" id="caption"><span>The player that plays your videos.</span><span>Not ads.</span></p>
-      </div>
-      <div class="player-bar">
-        <button class="replay" id="replay" aria-label="Play the intro again"><svg><use href="#play"/></svg></button>
-        <span class="time" id="tc" aria-hidden="true">42:17</span>
-        <div class="scrub" id="scrub" aria-hidden="true"><i></i><em style="left:7%"></em><em style="left:16%"></em><em style="left:25%"></em></div>
-        <span class="adbreaks" aria-hidden="true">Ad breaks: <b id="adn">none</b></span>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- OPEN SOURCE -->
   <section id="opensource">
     <div class="wrap">
-      <div class="oss">
-        <div class="oss-head">
-          <span class="oss-tag"><svg><use href="#code"/></svg>100% open source · GPL-3.0</span>
-          <h2>Open source. Yours to reuse.</h2>
-          <p class="intro">Every line of Open Player is public on GitHub. Read it, check that there are no ads or trackers, or build your own player from it.</p>
+      <div class="oss-grid">
+        <div>
+          <h2>Open source, so it’s yours to reuse</h2>
+          <p class="intro">Every line of Open Player is public on GitHub. Read it, check for yourself that there are no ads or trackers, or build your own player from it.</p>
+          <div class="oss-ctas">
+            <a class="btn main" href="/github" rel="noopener"><svg><use href="#code"/></svg><span>View the source code<small>github.com/adhil-bit/open-palyer</small></span></a>
+            <a href="https://github.com/adhil-bit/open-palyer/fork" rel="noopener">Fork it on GitHub</a>
+            <a href="https://github.com/adhil-bit/open-palyer/blob/main/LICENSE" rel="noopener">Read the licence</a>
+          </div>
         </div>
-        <ul class="oss-list">
-          <li><b>Use it</b><span>Free for everyone, for anything, forever.</span></li>
-          <li><b>Study it</b><span>The full code for Android, desktop and web is on GitHub.</span></li>
-          <li><b>Change it</b><span>Fork it, add features, rebrand it for your own app.</span></li>
-          <li><b>Share it</b><span>Pass on your version too. Keep it open source under the same GPL-3.0 licence and credit the original.</span></li>
+        <dl class="freedoms">
+          <div><dt>Use it</dt><dd>Free for everyone, for anything, forever.</dd></div>
+          <div><dt>Study it</dt><dd>The full code for Android, desktop and web is on GitHub.</dd></div>
+          <div><dt>Change it</dt><dd>Fork it, add features, rebrand it for your own app.</dd></div>
+          <div><dt>Share it</dt><dd>Pass on your version too. Keep it open source under the same GPL-3.0 licence and credit the original.</dd></div>
+        </dl>
+      </div>
+      <div class="oss-mix">
+        <h3>The best of MX Player, VLC and Next Player, in one open app</h3>
+        <ul>
+          <li><b>Like MX Player</b><span>Swipe gestures for brightness, volume and seeking, double-tap to skip, a PIN-locked private folder and a kids mode.</span></li>
+          <li><b>Like VLC</b><span>Plays almost any file: MKV, AVI, HEVC, AC3, DTS and built-in subtitles, using FFmpeg.</span></li>
+          <li><b>Like Next Player</b><span>Google’s modern Media3 player engine on Android, with audio-language and subtitle-track choice.</span></li>
+          <li><b>Only in Open Player</b><span>The same player on Android, Windows, Mac, Ubuntu and the web, and downloads you can verify.</span></li>
         </ul>
-        <div class="oss-mix">
-          <h3>The best of MX Player, VLC and Next Player, in one open app</h3>
-          <ul>
-            <li><b>Like MX Player</b><span>Swipe gestures for brightness, volume and seeking, double-tap to skip, a PIN-locked private folder and a kids mode.</span></li>
-            <li><b>Like VLC</b><span>Plays almost any file: MKV, AVI, HEVC, AC3, DTS and built-in subtitles, using FFmpeg.</span></li>
-            <li><b>Like Next Player</b><span>Google’s modern Media3 player engine on Android, with audio-language and subtitle-track choice.</span></li>
-            <li><b>Only in Open Player</b><span>The same player on Android, Windows, Mac, Ubuntu and the web, and downloads you can verify.</span></li>
-          </ul>
-          <p class="oss-built">Built on open source: <a href="https://ffmpeg.org" rel="noopener">FFmpeg</a>, <a href="https://developer.android.com/media/media3" rel="noopener">Android Media3</a>, <a href="https://capacitorjs.com" rel="noopener">Capacitor</a> and <a href="https://www.electronjs.org" rel="noopener">Electron</a>.</p>
-        </div>
-        <div class="oss-ctas">
-          <a class="btn main" href="/github" rel="noopener"><svg><use href="#code"/></svg><span>View the source code<small>github.com/adhil-bit/open-palyer</small></span></a>
-          <a class="btn plain" href="https://github.com/adhil-bit/open-palyer/fork" rel="noopener"><span>Fork it on GitHub<small>Start your own version</small></span></a>
-          <a class="oss-lic" href="https://github.com/adhil-bit/open-palyer/blob/main/LICENSE" rel="noopener">Read the licence</a>
-        </div>
+        <p class="oss-built">Built on open source: <a href="https://ffmpeg.org" rel="noopener">FFmpeg</a>, <a href="https://developer.android.com/media/media3" rel="noopener">Android Media3</a>, <a href="https://capacitorjs.com" rel="noopener">Capacitor</a> and <a href="https://www.electronjs.org" rel="noopener">Electron</a>.</p>
       </div>
     </div>
   </section>
+
 
   <!-- COMPARE -->
   <section id="compare">
@@ -674,6 +524,7 @@
   <section id="features">
     <div class="wrap">
       <h2>What’s inside</h2>
+      <p class="formats">Plays <b>MKV, MP4, AVI, MOV, WebM, TS</b> and more, with <b>HEVC, AV1, Dolby AC3, DTS and TrueHD</b> sound, music in <b>MP3, FLAC and Opus</b>, and <b>SRT, ASS and PGS</b> subtitles.</p>
       <div class="night">
         <div>
           <h3>Try night mode</h3>
@@ -745,12 +596,17 @@
   <!-- HOW TO USE -->
   <section id="use">
     <div class="wrap">
+      <div class="use-grid">
+      <div>
       <h2>Playing in a minute</h2>
       <ol class="steps">
         <li><h3>Install or open</h3><p>Download the Android app above, or open the web version and choose <b>Install</b> or <b>Add to Home Screen</b> in your browser.</p></li>
         <li><h3>Show your media</h3><p>In the Android app, tap <b>Show all my videos &amp; music</b> and allow access once. Prefer not to? Choose <b>I’ll add files myself</b>.</p></li>
         <li><h3>Play with gestures</h3><p>Tap a video and control it with swipes and taps.</p></li>
       </ol>
+      </div>
+      <figure class="phone"><img src="img/shot-library.webp" width="780" height="1688" alt="Open Player’s video library on a phone"></figure>
+      </div>
       <div class="gdemo-wrap">
         <div class="gdemo" id="gdemo" aria-hidden="true">
           <div class="gscreen">
@@ -876,16 +732,15 @@
     </div>
   </section>
 
+  </main>
+
   <div class="end">
     <div class="wrap">
-      <svg class="stamp" viewBox="0 0 512 512" role="img" aria-label="Ad-free, no tracking">
+      <svg class="stamp" viewBox="0 0 512 512" role="img" aria-label="Open Player">
         <rect width="512" height="512" rx="116" fill="#e11d48"/>
-        <defs><path id="stampc" d="M256 256m-170 0a170 170 0 1 1 340 0a170 170 0 1 1 -340 0"/></defs>
-        <circle cx="256" cy="256" r="206" fill="none" stroke="#fff" stroke-width="6" opacity=".6"/>
-        <g class="ring"><text font-size="40" font-weight="800" letter-spacing="7" fill="#fff" font-family="Archivo, Arial, sans-serif"><textPath href="#stampc" textLength="1040" lengthAdjust="spacing">AD-FREE • NO TRACKING • AD-FREE • NO TRACKING •</textPath></text></g>
-        <path d="M220 178c-8-4.8-17.5.9-17.5 10.2v135.6c0 9.3 9.5 15 17.5 10.2l113-67.8c7.7-4.6 7.7-15.8 0-20.4z" fill="#fff" transform="translate(256,256) scale(.92) translate(-256,-256)"/>
+        <path d="M220 178c-8-4.8-17.5.9-17.5 10.2v135.6c0 9.3 9.5 15 17.5 10.2l113-67.8c7.7-4.6 7.7-15.8 0-20.4z" fill="#fff"/>
       </svg>
-      <p class="cap">Watch without the ads.</p>
+      <p class="cap">Your films, songs and shows. <b>No ads.</b></p>
       <div class="ctas">
         <a class="btn main" data-apk href="/download/android"><svg><use href="#android"/></svg><span>Download for Android<small data-apk-meta>Free APK</small></span></a>
         <a class="btn plain" href="app/"><svg><use href="#globe"/></svg><span>Open in your browser<small>No install needed</small></span></a>
@@ -915,7 +770,7 @@
       const mb = r.size ? (r.size / 1048576).toFixed(1) + ' MB' : '';
       document.querySelectorAll('[data-apk]').forEach(a => { a.href = r.download; });
       document.querySelectorAll('[data-apk-meta]').forEach(m => { m.textContent = `Free APK, version ${r.version}${mb ? ', ' + mb : ''}`; });
-      if (r.date) $('dlMeta').textContent = `Free · Version ${r.version}${mb ? ' · ' + mb : ''} · Updated ${new Date(r.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} · Android 7.0+`;
+      if (r.date) $('dlMeta').textContent = `Version ${r.version}${mb ? ', ' + mb : ''}, updated ${new Date(r.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}. Android 7.0 or newer.`;
       { const vt = r.virustotal || {}; if (vt.status === 'done' && vt.engines) $('trustVt').textContent = vt.flagged === 0
           ? `The latest version was checked by ${vt.engines} antivirus engines on VirusTotal: none found anything.`
           : `The latest version was checked by ${vt.engines} antivirus engines on VirusTotal. See the full report.`; }
@@ -947,10 +802,10 @@
       if (os) document.querySelectorAll(`#dlList [data-os="${os}"]`).forEach(a => a.classList.add('mine'));
       const R = '/download/';
       const main = {
-        win: [R + 'windows', 'pc', 'Download for Windows', 'Installer, 64-bit · plays every format'],
-        mac: [R + 'mac', 'pc', 'Download for Mac', 'Apple silicon · plays every format'],
-        linux: [R + 'ubuntu', 'pc', 'Download for Ubuntu', '.deb package · plays every format'],
-        ios: ['app/', 'phone', 'Get it on iPhone', 'Opens in Safari · Add to Home Screen'],
+        win: [R + 'windows', 'pc', 'Download for Windows', '64-bit installer. Plays every format'],
+        mac: [R + 'mac', 'pc', 'Download for Mac', 'For Apple silicon. Plays every format'],
+        linux: [R + 'ubuntu', 'pc', 'Download for Ubuntu', '.deb package. Plays every format'],
+        ios: ['app/', 'phone', 'Get it on iPhone', 'Open in Safari, then Add to Home Screen'],
       }[os];
       if (!main) { document.querySelector('#plats [data-p="android"]').hidden = true; return; }   // Android or unknown: keep the APK button
       const b = document.getElementById('mainDl');
@@ -963,39 +818,24 @@
     /* ---------- motion (skipped when the visitor prefers reduced motion) ---------- */
     const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Hero: the intro plays like a video. Ad markers on the timeline get removed one by one.
+    // Hero: the headline plays as subtitles on the real player, and the yellow ad-break marks
+    // on its seek bar get cut out one by one. This is the page's one piece of automatic motion.
     (() => {
-      const hero = document.querySelector('.hero'), cue = document.getElementById('cue'), ad = document.getElementById('adcard');
-      const bar = document.querySelector('#scrub i'), marks = [...document.querySelectorAll('#scrub em')];
-      const tc = document.getElementById('tc'), adn = document.getElementById('adn');
-      const cues = [[0.0, 'Most free players pay for themselves with ads.'], [0.32, 'Banners. Pop-ups. Ads before your film.'], [0.7, '']];
-      const END = 42 * 60 + 17, DUR = 6500;
-      let raf, t0;
-      const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+      const cue = document.getElementById('cue'), ad = document.getElementById('adcard'), adn = document.getElementById('adn');
+      const marks = [...document.querySelectorAll('#marks em')];
+      const lines = [[0, 'Most free players pay for themselves with ads.'], [2000, 'Banners. Pop-ups. Ads in the middle of your film.'], [4600, 'Open Player just plays your video. <b>No ads.</b>']];
+      let timers = [];
+      const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+      function say(html) { cue.classList.remove('on'); at(200, () => { cue.innerHTML = html; cue.classList.add('on'); }); }
       function run() {
-        cancelAnimationFrame(raf);
-        hero.classList.add('run'); hero.classList.remove('done');
-        marks.forEach(m => m.classList.remove('gone'));
-        adn.textContent = marks.length; ad.className = 'adcard'; cue.className = 'cue';
-        bar.style.animation = 'none'; bar.style.width = '0%';
-        t0 = performance.now();
-        let shownCue = -1;
-        const frame = now => {
-          const k = Math.min(1, (now - t0) / DUR), pos = k * 38;
-          bar.style.width = pos + '%';
-          tc.textContent = fmt(k * END);
-          const ci = cues.findLastIndex(c => k >= c[0]);
-          if (ci !== shownCue) { shownCue = ci; cue.classList.remove('on'); setTimeout(() => { cue.textContent = cues[ci][1]; if (cues[ci][1]) cue.classList.add('on'); }, 180); }
-          marks.forEach((m, i) => {
-            if (!m.classList.contains('gone') && pos >= parseFloat(m.style.left)) {
-              m.classList.add('gone'); adn.textContent = marks.length - i - 1 || 'none';
-              ad.className = 'adcard on'; setTimeout(() => ad.classList.add('kill'), 260); setTimeout(() => ad.classList.remove('on'), 900);
-            }
-          });
-          if (k >= 0.72) hero.classList.add('done');
-          if (k < 1) raf = requestAnimationFrame(frame);
-        };
-        raf = requestAnimationFrame(frame);
+        timers.forEach(clearTimeout); timers = [];
+        marks.forEach(m => m.classList.remove('gone')); adn.textContent = marks.length;
+        ad.className = 'adcard';
+        lines.forEach(([t, h]) => at(t, () => say(h)));
+        at(2300, () => ad.classList.add('on'));
+        at(3100, () => ad.classList.add('kill'));
+        marks.forEach((m, i) => at(3300 + i * 380, () => { m.classList.add('gone'); adn.textContent = marks.length - i - 1 || 'none'; }));
+        at(4300, () => ad.className = 'adcard');
       }
       document.getElementById('replay').onclick = run;
       if (!calm) run();
@@ -1133,102 +973,6 @@
     } catch (err) { fail(err.message); }
     btn.disabled = false;
   };
-})();
-</script>
-<script>
-/* Motion: rotating word, ad pop-ups getting blocked, tilt, counters, scroll reveals.
-   Everything is skipped for visitors who prefer reduced motion. */
-(() => {
-  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const $ = id => document.getElementById(id);
-
-  // scroll reveal: headings, intros and cards slide in as they come into view
-  if (!calm && 'IntersectionObserver' in window) {
-    const sel = 'section h2, section .intro, .tcard, .stats-grid > div, .rv, .rv-form, .oss, .oss-mix li, #features .wrap > *:not(h2):not(.intro), #compare table, #desktop .wrap > *, #use .wrap > *, #privacy .wrap > *, #verify .wrap > *, #faq details';
-    const els = [...document.querySelectorAll(sel)].filter(e => !e.closest('.top'));
-    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
-    els.forEach(e => {
-      const sib = [...e.parentElement.children].filter(x => x.matches(sel)).indexOf(e);
-      e.style.setProperty('--d', Math.min(sib, 6) * 0.07 + 's');
-      e.classList.add('reveal'); io.observe(e);
-    });
-    // reviews and other lists that load later
-    new MutationObserver(() => document.querySelectorAll('.rv:not(.reveal)').forEach(e => { e.classList.add('reveal'); io.observe(e); }))
-      .observe(document.body, { childList: true, subtree: true });
-  }
-
-  // counters count up when the numbers come into view
-  const nums = [...document.querySelectorAll('[data-count]')];
-  if ('IntersectionObserver' in window) {
-    const co = new IntersectionObserver(es => es.forEach(e => {
-      if (!e.isIntersecting) return; co.unobserve(e.target);
-      const el = e.target, to = +el.dataset.count, plus = el.hasAttribute('data-plus') ? '+' : '';
-      if (calm || !to) { el.textContent = to + plus; return; }
-      const t0 = performance.now(), dur = 1200;
-      const step = t => { const k = Math.min(1, (t - t0) / dur), v = Math.round(to * (1 - Math.pow(1 - k, 3))); el.textContent = v + (k === 1 ? plus : ''); if (k < 1) requestAnimationFrame(step); };
-      requestAnimationFrame(step);
-    }), { threshold: .6 });
-    nums.forEach(n => co.observe(n));
-  }
-  if (calm) return;
-
-  // format strip: a second copy makes the loop seamless
-  const mq = document.querySelector('.mq-track'); if (mq) mq.innerHTML += mq.innerHTML;
-
-  // rotating word in the headline
-  const rot = $('rotWord'), words = ['videos.', 'films.', 'songs.', 'series.', 'reels.'];
-  let wi = 0;
-  if (rot) setInterval(() => {
-    if (document.hidden) return;
-    const old = rot.firstElementChild; wi = (wi + 1) % words.length;
-    old.classList.add('out');
-    setTimeout(() => { const n = document.createElement('span'); n.textContent = words[wi]; n.className = 'in'; rot.replaceChildren(n); }, 330);
-  }, 2600);
-
-  // fake ads fly onto the player and get blocked
-  const pops = $('adPops'), cnt = $('adBlocked');
-  const ads = [
-    { ic: '▶', bg: '#e11d48', t: '<i>AD</i>Video will play after ad', s: 'Skip in 5…' },
-    { ic: '🧹', bg: '#0ea5e9', t: '<i>Sponsored</i>Phone Cleaner PRO', s: 'Install now — 98% junk!' },
-    { ic: '🎁', bg: '#a855f7', t: 'Congratulations!', s: 'You won a free gift. Tap here' },
-    { ic: '🎰', bg: '#f59e0b', t: '<i>AD</i>Win ₹10,000 today', s: 'Download the app' },
-  ];
-  const spots = [[34, 12], [50, 30], [36, 54], [52, 62], [42, 36]];   // right of the phone, which covers the left of the player
-  let ai = 0, blocked = 0;
-  const showAd = () => {
-    if (!pops || document.hidden) return;
-    const a = ads[ai % ads.length], [x, y] = spots[ai % spots.length]; ai++;
-    const el = document.createElement('div');
-    el.className = 'adpop';
-    el.style.left = x + '%'; el.style.top = y + '%';
-    el.innerHTML = `<span class="ic" style="background:${a.bg}">${a.ic}</span><span>${a.t}<small>${a.s}</small></span><span class="stampx"><b>BLOCKED</b></span>`;
-    pops.appendChild(el);
-    el.animate([{ opacity: 0, transform: 'translateY(16px) scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both' });
-    setTimeout(() => {
-      el.querySelector('.stampx').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, fill: 'forwards' });
-      el.querySelector('.stampx b').animate([{ opacity: 0, transform: 'rotate(-12deg) scale(2)' }, { opacity: 1, transform: 'rotate(-12deg) scale(1)' }], { duration: 260, easing: 'cubic-bezier(.3,1.6,.5,1)', fill: 'forwards' });
-      el.animate([{ transform: 'none' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { duration: 220, delay: 180 });
-      blocked++; if (cnt) cnt.textContent = blocked;
-    }, 1100);
-    setTimeout(() => el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.6) rotate(-6deg)' }], { duration: 320, easing: 'ease-in', fill: 'forwards' }).onfinish = () => el.remove(), 2100);
-  };
-  setTimeout(() => { showAd(); setInterval(showAd, 2600); }, 1400);
-
-  // screenshots tilt gently toward the mouse (computers only)
-  const shots = document.querySelector('.shots');
-  if (shots && matchMedia('(hover: hover) and (pointer: fine)').matches) {
-    const wide = shots.querySelector('.shot-wide'), phone = shots.querySelector('.shot-phone');
-    let raf = 0;
-    shots.addEventListener('pointermove', e => {
-      const r = shots.getBoundingClientRect(), dx = (e.clientX - r.left) / r.width - .5, dy = (e.clientY - r.top) / r.height - .5;
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        wide.style.transform = `rotateY(${dx * 8}deg) rotateX(${-dy * 6}deg)`;
-        phone.style.transform = `translate(${dx * -14}px, ${dy * -10}px) rotateY(${dx * 10}deg)`;
-      });
-    });
-    shots.addEventListener('pointerleave', () => { wide.style.transform = ''; phone.style.transform = ''; });
-  }
 })();
 </script>
 </body>
