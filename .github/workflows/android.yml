@@ -4,6 +4,8 @@ on:
   push:
     # main → the normal download.  beta → a test build at /download/android-beta, tried before main.
     branches: [main, beta]
+    # Website-only changes don't need a new app version
+    paths-ignore: ['index.html', 'img/**', 'api/**', 'vercel.json', 'release.json', '*.md']
   workflow_dispatch:
 
 permissions:
