@@ -77,7 +77,70 @@
     /* hero: a black screen with the headline as a two-line subtitle */
     .hero { padding: 28px 0 0; }
     /* top: copy + download on the left, real screenshots on the right */
-    .top { padding: 44px 0 8px; overflow: hidden; }
+    .top { padding: 44px 0 8px; overflow: hidden; position: relative; isolation: isolate; }
+    /* ---- motion: hero glow, entrance, rotating word, floating shots, ad pop-ups ---- */
+    .top::before, .top::after { content: ''; position: absolute; z-index: -1; width: 620px; height: 620px; border-radius: 50%; filter: blur(90px); opacity: .32; pointer-events: none; }
+    .top::before { background: var(--sub); top: -260px; right: -160px; }
+    .top::after { background: #7c5cff; bottom: -320px; left: -220px; opacity: .18; }
+    .rot { display: inline-block; vertical-align: bottom; overflow: hidden; height: 1.08em; }
+    .rot > span { display: inline-block; }
+    .shots { perspective: 1200px; }
+    .shot-wide, .shot-phone { transition: transform .25s ease-out; will-change: transform; }
+    .shot-wide { position: relative; }
+    .adpops { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 14px; }
+    .adpop { position: absolute; background: #fff; color: #111; border-radius: 10px; padding: 10px 12px; font: 600 13px/1.25 var(--text); box-shadow: 0 12px 30px rgba(0,0,0,.45); max-width: 220px; display: flex; gap: 10px; align-items: center; }
+    .adpop i { font-style: normal; font-size: 10px; font-weight: 800; background: #f5b301; color: #111; border-radius: 4px; padding: 1px 5px; margin-right: 4px; }
+    .adpop .ic { width: 34px; height: 34px; border-radius: 8px; flex: none; display: grid; place-items: center; font-size: 18px; color: #fff; }
+    .adpop small { display: block; font-weight: 500; color: #555; font-size: 11.5px; margin-top: 2px; }
+    .adpop .stampx { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 10px; background: color-mix(in srgb, var(--sub) 18%, transparent); opacity: 0; }
+    .adpop .stampx b { border: 3px solid var(--sub); color: var(--sub); font: 900 18px/1 var(--display); letter-spacing: .08em; padding: 4px 10px; border-radius: 6px; transform: rotate(-12deg) scale(2); opacity: 0; background: rgba(255,255,255,.9); }
+    .adcount { position: absolute; right: 12px; top: -18px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); font-size: 13px; color: var(--soft); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
+    .adcount b { color: var(--ink); }
+    .adcount .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 0 rgba(34,197,94,.6); }
+    .adcount .blk { color: var(--soft); }
+    @media (max-width: 520px) { .adcount { font-size: 11.5px; padding: 5px 9px; top: -14px; } .adcount .blk { display: none; } .adpop { transform: scale(.8); transform-origin: top left; } }
+    /* numbers + format strip */
+    .stats { padding: 26px 0 8px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .stats-grid div { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+    .stats-grid b { display: block; font: 800 38px/1 var(--display); color: var(--sub); }
+    .stats-grid span { display: block; margin-top: 6px; color: var(--soft); font-size: 14.5px; }
+    @media (max-width: 760px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
+    .marquee { margin-top: 22px; overflow: hidden; border-block: 1px solid var(--line); padding: 12px 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+    .mq-track { display: flex; gap: 12px; width: max-content; }
+    .mq-track span { white-space: nowrap; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--raised); font-weight: 700; font-size: 14px; color: var(--soft); }
+    /* scroll reveal (added by script, so the page works without it) */
+    .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); transition-delay: var(--d, 0s); }
+    .reveal.in { opacity: 1; transform: none; }
+    .tcard, .rv, .stats-grid div { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+    .tcard:hover, .rv:hover, .stats-grid div:hover { transform: translateY(-4px); box-shadow: 0 14px 30px -14px rgba(0,0,0,.5); }
+    @media (prefers-reduced-motion: no-preference) {
+      .top::before { animation: drift1 16s ease-in-out infinite alternate; }
+      .top::after { animation: drift2 19s ease-in-out infinite alternate; }
+      .top-copy > * { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; }
+      .top-copy > :nth-child(2) { animation-delay: .08s; } .top-copy > :nth-child(3) { animation-delay: .16s; }
+      .top-copy > :nth-child(4) { animation-delay: .24s; } .top-copy > :nth-child(5) { animation-delay: .32s; }
+      .shots { animation: rise 1s cubic-bezier(.2,.7,.2,1) .2s both; }
+      .shot-phone img { animation: bob 6s ease-in-out infinite; }
+      .shot-wide img { animation: bob 7s ease-in-out -2s infinite; }
+      .adcount .dot { animation: ping 2s ease-out infinite; }
+      .rot > span.out { animation: wordOut .35s ease-in both; }
+      .rot > span.in { animation: wordIn .45s cubic-bezier(.2,.8,.2,1) both; }
+      .mq-track { animation: marquee 38s linear infinite; }
+      .marquee:hover .mq-track { animation-play-state: paused; }
+      .btn.main { position: relative; overflow: hidden; }
+      .btn.main::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); transform: translateX(-120%); animation: shine 5s ease-in-out 1.5s infinite; pointer-events: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } .tcard:hover, .rv:hover, .stats-grid div:hover { transform: none; } }
+    @keyframes drift1 { to { transform: translate(-160px, 120px) scale(1.15); } }
+    @keyframes drift2 { to { transform: translate(200px, -140px) scale(1.1); } }
+    @keyframes rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+    @keyframes bob { 50% { transform: translateY(-8px); } }
+    @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,.6); } 100% { box-shadow: 0 0 0 10px rgba(34,197,94,0); } }
+    @keyframes wordOut { to { transform: translateY(-110%); opacity: 0; } }
+    @keyframes wordIn { from { transform: translateY(110%); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes marquee { to { transform: translateX(-50%); } }
+    @keyframes shine { 0% { transform: translateX(-120%); } 30%, 100% { transform: translateX(120%); } }
     .top-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
     .kicker { display: inline-block; font-weight: 800; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--sub); background: color-mix(in srgb, var(--sub) 12%, transparent); border: 1px solid color-mix(in srgb, var(--sub) 35%, transparent); padding: 6px 12px; border-radius: 999px; }
     .top h1 { margin: 18px 0 0; font: 800 clamp(36px, 4.6vw, 58px)/1.04 var(--display); font-stretch: 110%; letter-spacing: -.01em; }
@@ -90,8 +153,8 @@
     .trust-row svg { width: 17px; height: 17px; color: var(--yes); }
     .trust-row a { color: inherit; }
     .shots { position: relative; margin: 0; padding: 0 0 34px 0; }
-    .shot-wide { margin-left: 70px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 60px -20px rgba(0,0,0,.45); background: #000; }
-    .shot-wide img { display: block; width: 100%; height: auto; }
+    .shot-wide { margin-left: 70px; border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 30px 60px -20px rgba(0,0,0,.45); background: #000; }
+    .shot-wide img { display: block; width: 100%; height: auto; border-radius: 14px; }
     .shot-phone { position: absolute; left: 0; bottom: 30px; width: 34%; border-radius: 28px; padding: 7px; background: #0b0c0e; box-shadow: 0 24px 50px -12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08) inset; }
     .shot-phone img { display: block; width: 100%; height: auto; border-radius: 22px; }
     .shots figcaption { position: absolute; right: 0; bottom: 0; font-size: 12.5px; color: var(--soft); text-align: right; max-width: 62%; }
@@ -432,7 +495,7 @@
     <div class="wrap top-grid">
       <div class="top-copy">
         <span class="kicker">Your media. Your control.</span>
-        <h1><span class="nw">Watch your videos.</span><br><span class="red">Not ads.</span></h1>
+        <h1><span class="nw">Watch your <span class="rot" id="rotWord" aria-live="off"><span>videos.</span></span></span><br><span class="red">Not ads.</span></h1>
         <p class="lead">Open Player is a free, open-source video and music player. The gestures, subtitles and equalizer you know from MX Player and VLC, with no ads, no account and no tracking.</p>
         <div id="download">
           <div class="ctas">
@@ -459,12 +522,28 @@
         </ul>
       </div>
       <figure class="shots" aria-label="Screenshots of Open Player">
-        <div class="shot-wide"><img src="img/shot-player.webp" width="1280" height="720" alt="Open Player playing a video, with the seek bar, skip and subtitle buttons"></div>
+        <div class="shot-wide"><img src="img/shot-player.webp" width="1280" height="720" alt="Open Player playing a video, with the seek bar, skip and subtitle buttons">
+          <div class="adpops" id="adPops" aria-hidden="true"></div>
+          <div class="adcount" aria-hidden="true"><span class="dot"></span>Ads shown to you: <b>0</b><span class="blk">· pop-ups blocked: <b id="adBlocked">0</b></span></div>
+        </div>
         <div class="shot-phone"><img src="img/shot-library.webp" width="780" height="1688" alt="Open Player’s video library on a phone"></div>
         <figcaption>Real screenshots of the app, with sample videos.</figcaption>
       </figure>
     </div>
   </header>
+
+  <!-- numbers + formats strip -->
+  <section class="stats" aria-label="Open Player in numbers">
+    <div class="wrap stats-grid">
+      <div><b data-count="0">0</b><span>ads, ever</span></div>
+      <div><b data-count="0">0</b><span>trackers</span></div>
+      <div><b data-count="20" data-plus>20+</b><span>video &amp; audio formats</span></div>
+      <div><b data-count="5">5</b><span>platforms: Android, Windows, Mac, Ubuntu, web</span></div>
+    </div>
+    <div class="marquee" aria-hidden="true"><div class="mq-track">
+      <span>MKV</span><span>MP4</span><span>HEVC · x265</span><span>AV1</span><span>WebM</span><span>AVI</span><span>MOV</span><span>Dolby AC3</span><span>E-AC3</span><span>DTS</span><span>TrueHD</span><span>FLAC</span><span>MP3</span><span>Opus</span><span>SRT</span><span>ASS / SSA</span><span>PGS subtitles</span><span>4K HDR</span>
+    </div></div>
+  </section>
 
   <!-- WHY TRUST -->
   <section id="trust">
@@ -1055,6 +1134,102 @@
     } catch (err) { fail(err.message); }
     btn.disabled = false;
   };
+})();
+</script>
+<script>
+/* Motion: rotating word, ad pop-ups getting blocked, tilt, counters, scroll reveals.
+   Everything is skipped for visitors who prefer reduced motion. */
+(() => {
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = id => document.getElementById(id);
+
+  // scroll reveal: headings, intros and cards slide in as they come into view
+  if (!calm && 'IntersectionObserver' in window) {
+    const sel = 'section h2, section .intro, .tcard, .stats-grid > div, .rv, .rv-form, .oss, .oss-mix li, #features .wrap > *:not(h2):not(.intro), #compare table, #desktop .wrap > *, #use .wrap > *, #privacy .wrap > *, #verify .wrap > *, #faq details';
+    const els = [...document.querySelectorAll(sel)].filter(e => !e.closest('.top'));
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin: '0px 0px -8% 0px' });
+    els.forEach(e => {
+      const sib = [...e.parentElement.children].filter(x => x.matches(sel)).indexOf(e);
+      e.style.setProperty('--d', Math.min(sib, 6) * 0.07 + 's');
+      e.classList.add('reveal'); io.observe(e);
+    });
+    // reviews and other lists that load later
+    new MutationObserver(() => document.querySelectorAll('.rv:not(.reveal)').forEach(e => { e.classList.add('reveal'); io.observe(e); }))
+      .observe(document.body, { childList: true, subtree: true });
+  }
+
+  // counters count up when the numbers come into view
+  const nums = [...document.querySelectorAll('[data-count]')];
+  if ('IntersectionObserver' in window) {
+    const co = new IntersectionObserver(es => es.forEach(e => {
+      if (!e.isIntersecting) return; co.unobserve(e.target);
+      const el = e.target, to = +el.dataset.count, plus = el.hasAttribute('data-plus') ? '+' : '';
+      if (calm || !to) { el.textContent = to + plus; return; }
+      const t0 = performance.now(), dur = 1200;
+      const step = t => { const k = Math.min(1, (t - t0) / dur), v = Math.round(to * (1 - Math.pow(1 - k, 3))); el.textContent = v + (k === 1 ? plus : ''); if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    }), { threshold: .6 });
+    nums.forEach(n => co.observe(n));
+  }
+  if (calm) return;
+
+  // format strip: a second copy makes the loop seamless
+  const mq = document.querySelector('.mq-track'); if (mq) mq.innerHTML += mq.innerHTML;
+
+  // rotating word in the headline
+  const rot = $('rotWord'), words = ['videos.', 'films.', 'songs.', 'series.', 'reels.'];
+  let wi = 0;
+  if (rot) setInterval(() => {
+    if (document.hidden) return;
+    const old = rot.firstElementChild; wi = (wi + 1) % words.length;
+    old.classList.add('out');
+    setTimeout(() => { const n = document.createElement('span'); n.textContent = words[wi]; n.className = 'in'; rot.replaceChildren(n); }, 330);
+  }, 2600);
+
+  // fake ads fly onto the player and get blocked
+  const pops = $('adPops'), cnt = $('adBlocked');
+  const ads = [
+    { ic: '▶', bg: '#e11d48', t: '<i>AD</i>Video will play after ad', s: 'Skip in 5…' },
+    { ic: '🧹', bg: '#0ea5e9', t: '<i>Sponsored</i>Phone Cleaner PRO', s: 'Install now — 98% junk!' },
+    { ic: '🎁', bg: '#a855f7', t: 'Congratulations!', s: 'You won a free gift. Tap here' },
+    { ic: '🎰', bg: '#f59e0b', t: '<i>AD</i>Win ₹10,000 today', s: 'Download the app' },
+  ];
+  const spots = [[34, 12], [50, 30], [36, 54], [52, 62], [42, 36]];   // right of the phone, which covers the left of the player
+  let ai = 0, blocked = 0;
+  const showAd = () => {
+    if (!pops || document.hidden) return;
+    const a = ads[ai % ads.length], [x, y] = spots[ai % spots.length]; ai++;
+    const el = document.createElement('div');
+    el.className = 'adpop';
+    el.style.left = x + '%'; el.style.top = y + '%';
+    el.innerHTML = `<span class="ic" style="background:${a.bg}">${a.ic}</span><span>${a.t}<small>${a.s}</small></span><span class="stampx"><b>BLOCKED</b></span>`;
+    pops.appendChild(el);
+    el.animate([{ opacity: 0, transform: 'translateY(16px) scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both' });
+    setTimeout(() => {
+      el.querySelector('.stampx').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, fill: 'forwards' });
+      el.querySelector('.stampx b').animate([{ opacity: 0, transform: 'rotate(-12deg) scale(2)' }, { opacity: 1, transform: 'rotate(-12deg) scale(1)' }], { duration: 260, easing: 'cubic-bezier(.3,1.6,.5,1)', fill: 'forwards' });
+      el.animate([{ transform: 'none' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { duration: 220, delay: 180 });
+      blocked++; if (cnt) cnt.textContent = blocked;
+    }, 1100);
+    setTimeout(() => el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.6) rotate(-6deg)' }], { duration: 320, easing: 'ease-in', fill: 'forwards' }).onfinish = () => el.remove(), 2100);
+  };
+  setTimeout(() => { showAd(); setInterval(showAd, 2600); }, 1400);
+
+  // screenshots tilt gently toward the mouse (computers only)
+  const shots = document.querySelector('.shots');
+  if (shots && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    const wide = shots.querySelector('.shot-wide'), phone = shots.querySelector('.shot-phone');
+    let raf = 0;
+    shots.addEventListener('pointermove', e => {
+      const r = shots.getBoundingClientRect(), dx = (e.clientX - r.left) / r.width - .5, dy = (e.clientY - r.top) / r.height - .5;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        wide.style.transform = `rotateY(${dx * 8}deg) rotateX(${-dy * 6}deg)`;
+        phone.style.transform = `translate(${dx * -14}px, ${dy * -10}px) rotateY(${dx * 10}deg)`;
+      });
+    });
+    shots.addEventListener('pointerleave', () => { wide.style.transform = ''; phone.style.transform = ''; });
+  }
 })();
 </script>
 </body>
